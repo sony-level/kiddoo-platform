@@ -2,21 +2,50 @@ name: Rust
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "develop" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "develop", "master" ]
 
 env:
   CARGO_TERM_COLOR: always
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
 jobs:
-  build:
-
+  database:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ${secrets.POSTGRES_USER} -d ${secrets.POSTGRES_DB}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install diesel_cli (Postgres)
+        run: cargo install diesel_cli --no-default-features --features postgres
+
+      - name: Build (database crate)
+        working-directory: database
+        run: cargo build --verbose
+
+    # - name: Run migrations (if any)
+    #   working-directory: database
+    #   run: diesel migration run
+    #   # si tu n'as pas encore de migrations, tu peux commenter cette étape
+
+    # - name: Run tests (database crate)
+    #   working-directory: database
+    #   run: cargo test --verbose
