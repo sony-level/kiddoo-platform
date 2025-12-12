@@ -17,6 +17,7 @@ Map.md
 
 #environement variables
 ³.env
+.env.local
 !.env.example
 
 # RustRover
