@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "develop", "master" ]
+    branches: ["develop", "release"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -38,7 +38,7 @@ jobs:
         run: cargo install diesel_cli --no-default-features --features postgres
 
       - name: Build (database crate)
-        working-directory: database
+        working-directory: libs/database
         run: cargo build --verbose
 
     # - name: Run migrations (if any)
