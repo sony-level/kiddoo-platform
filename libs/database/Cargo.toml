@@ -9,6 +9,8 @@ edition = "2024"
 diesel = { version = "2.3.4", features = ["postgres", "r2d2", "chrono"] } # Postgres, connection pool, date-time
 diesel-derive-enum = { version = "2.1.0", features = ["postgres"] } # Enumerations pour les types de données par exemple ( parent, babysitter, agency )
 rocket = { version = "0.5.1", features = ["tls", "secrets"] } # Web framework
+dotenvy = "0.15.6"
+
 
 [lib]
 name = "database"
