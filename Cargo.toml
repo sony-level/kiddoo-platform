@@ -1,7 +1,7 @@
 
 [workspace]  # Workspace for baby sitting service
 members = [
-    "libs/database",
+    "libs/database", "services/api-gateway", "services/identity-proxy",
 ]
 resolver = "2"
 
