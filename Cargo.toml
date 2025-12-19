@@ -1,0 +1,12 @@
+
+[workspace]  # Workspace for baby sitting service
+members = [
+    "libs/database", "services/api-gateway", "services/identity-proxy",
+]
+resolver = "2"
+
+[workspace.package] # Configuration for all workspace members
+description = "Baby sitting service API"
+authors = ["Level Sony"]
+version = "0.1.0"
+edition = "2024"
