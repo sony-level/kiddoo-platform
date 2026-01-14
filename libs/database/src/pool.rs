@@ -34,7 +34,6 @@ pub async fn create_pool() -> DbPool {
  * @return {AsyncPgConnection} - A connection to the database.
  *
  */
-
 pub async fn establish_connection_with_ssl()
 -> Result<tokio_postgres::Client, Box<dyn std::error::Error>> {
     dotenv().ok();
