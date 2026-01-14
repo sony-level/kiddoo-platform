@@ -2,15 +2,14 @@
  *  This module provides a database connection pool for the application.
  *  It is used to manage database connections and provide a consistent interface for database operations.
  */
-
 use diesel::prelude::*;
 use diesel_async::AsyncPgConnection;
-use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::pooled_connection::deadpool::Pool;
 use dotenvy::dotenv;
-use std::env;
 use native_tls::TlsConnector;
 use postgres_native_tls::MakeTlsConnector;
+use std::env;
 use tokio_postgres::Config;
 
 pub type DbPool = Pool<AsyncPgConnection>;
@@ -18,12 +17,12 @@ pub type DbPool = Pool<AsyncPgConnection>;
 /**
  *  Creates an async database connection pool with SSL support.
  * @return {DbPool} - A connection pool to the database.
- * 
+ *
  */
 pub async fn create_pool() -> DbPool {
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    
+
     let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(&database_url);
     Pool::builder(config)
         .build()
@@ -33,29 +32,30 @@ pub async fn create_pool() -> DbPool {
 /**
  *  Establishes a single async connection to the database with SSL.
  * @return {AsyncPgConnection} - A connection to the database.
- * 
+ *
  */
-pub async fn establish_connection_with_ssl() -> Result<tokio_postgres::Client, Box<dyn std::error::Error>> {
+
+pub async fn establish_connection_with_ssl()
+-> Result<tokio_postgres::Client, Box<dyn std::error::Error>> {
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    
+
     let tls_connector = TlsConnector::builder()
         .danger_accept_invalid_certs(true) // For self-signed certificates
         .build()?;
     let connector = MakeTlsConnector::new(tls_connector);
-    
+
     let config: Config = database_url.parse()?;
     let (client, connection) = config.connect(connector).await?;
-    
+
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
-    
+
     Ok(client)
 }
-
 
 /**
  *  This function establishes a synchronous connection to the database (no SSL).
@@ -68,4 +68,3 @@ pub fn establish_connection() -> PgConnection {
     PgConnection::establish(&database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
-
