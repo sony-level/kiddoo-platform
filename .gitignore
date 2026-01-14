@@ -21,6 +21,7 @@ TASKS.md
 ³.env
 .env.local
 !.env.example
+.env 
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
