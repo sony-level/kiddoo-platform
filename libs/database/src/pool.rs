@@ -19,10 +19,6 @@ pub type DbPool = Pool<AsyncPgConnection>;
  *  Creates an async database connection pool with SSL support.
  * @return {DbPool} - A connection pool to the database.
  * 
- * @example
- * ```rust
- * let pool = create_pool().await;
- * ```
  */
 pub async fn create_pool() -> DbPool {
     dotenv().ok();
@@ -38,10 +34,6 @@ pub async fn create_pool() -> DbPool {
  *  Establishes a single async connection to the database with SSL.
  * @return {AsyncPgConnection} - A connection to the database.
  * 
- * @example
- * ```rust
- * let client = establish_connection_with_ssl().await;
- * ```
  */
 pub async fn establish_connection_with_ssl() -> Result<tokio_postgres::Client, Box<dyn std::error::Error>> {
     dotenv().ok();
