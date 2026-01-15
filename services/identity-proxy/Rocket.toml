@@ -1,0 +1,9 @@
+[default]
+port = 8001
+address = "0.0.0.0"
+[debug]
+port = 8001
+address = "0.0.0.0"
+[release]
+port = 8001
+address = "0.0.0.0"
