@@ -1,10 +1,10 @@
 
 [workspace]  # Workspace for baby sitting service
 members = [
-    "libs/database", "services/api-gateway", "services/identity-proxy",
+    "libs/database", "services/api-gateway", "services/identity-proxy", "services/orchestrator",
 ]
 resolver = "2"
-default-run = "api-gateway"
+default-run = "orchestrator"
 
 [workspace.package] # Configuration for all workspace members
 description = "Baby sitting service API"
