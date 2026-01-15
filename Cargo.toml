@@ -4,6 +4,7 @@ members = [
     "libs/database", "services/api-gateway", "services/identity-proxy",
 ]
 resolver = "2"
+default-run = "api-gateway"
 
 [workspace.package] # Configuration for all workspace members
 description = "Baby sitting service API"
