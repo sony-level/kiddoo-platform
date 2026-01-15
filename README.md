@@ -1,3 +1,3 @@
-# api-babysiting
+# api-babysitting
 
-API REST  for mobile application  babysiting 
+API REST  for mobile application  babysitting 
