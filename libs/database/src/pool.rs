@@ -39,9 +39,27 @@ pub async fn establish_connection_with_ssl()
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-    let tls_connector = TlsConnector::builder()
-        .danger_accept_invalid_certs(true) // For self-signed certificates
-        .build()?;
+    // Control acceptance of invalid TLS certificates via environment variables.
+    // DB_ACCEPT_INVALID_CERTS: "true" or "false" (default: "false").
+    // APP_ENV: "production" or other (default: "development").
+    let accept_invalid_certs = env::var("DB_ACCEPT_INVALID_CERTS")
+        .unwrap_or_else(|_| "false".to_string())
+        .eq_ignore_ascii_case("true");
+    let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+
+    if app_env.eq_ignore_ascii_case("production") && accept_invalid_certs {
+        panic!(
+            "Invalid configuration: DB_ACCEPT_INVALID_CERTS must not be enabled in production."
+        );
+    }
+
+    let mut builder = TlsConnector::builder();
+    if accept_invalid_certs {
+        // Allow invalid/self-signed certificates only in non-production environments.
+        builder = builder.danger_accept_invalid_certs(true);
+    }
+
+    let tls_connector = builder.build()?;
     let connector = MakeTlsConnector::new(tls_connector);
 
     let config: Config = database_url.parse()?;

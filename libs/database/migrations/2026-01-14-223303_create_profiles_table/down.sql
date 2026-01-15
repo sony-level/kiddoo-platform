@@ -1,7 +1,7 @@
 -- This file should undo anything in `up.sql`
 -- Rollback de la migration profiles
 
-DROP POLICY IF EXISTS profiles_admin_all_access ON kidoo.profiles;
+DROP POLICY IF EXISTS profiles_moderator_all_access ON kidoo.profiles;
 DROP POLICY IF EXISTS profiles_public_read ON kidoo.profiles;
 DROP POLICY IF EXISTS profiles_own_full_access ON kidoo.profiles;
 
