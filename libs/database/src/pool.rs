@@ -56,7 +56,7 @@ pub async fn establish_connection_with_ssl()
     let mut builder = TlsConnector::builder();
     // if accept_invalid_certs {
     // Allow invalid/self-signed certificates only in non-production environments.
-  //  builder.danger_accept_invalid_certs(true);
+    //  builder.danger_accept_invalid_certs(true);
     // }
 
     let tls_connector = builder.build()?;
