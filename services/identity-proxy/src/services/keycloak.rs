@@ -194,7 +194,7 @@ impl KeycloakService {
     async fn request_token(&self, request: TokenRequest<'_>) -> Result<TokenResponse, AuthError> {
         let response = self
             .client
-            .post(&self.config.token_url())
+            .post(self.config.token_url())
             .form(&request)
             .send()
             .await
@@ -235,7 +235,7 @@ impl KeycloakService {
     pub async fn get_user_info(&self, access_token: &str) -> Result<UserInfo, AuthError> {
         let response = self
             .client
-            .get(&self.config.userinfo_url())
+            .get(self.config.userinfo_url())
             .bearer_auth(access_token)
             .send()
             .await
@@ -271,7 +271,7 @@ impl KeycloakService {
 
         let response = self
             .client
-            .post(&self.config.logout_url())
+            .post(self.config.logout_url())
             .form(&params)
             .send()
             .await
