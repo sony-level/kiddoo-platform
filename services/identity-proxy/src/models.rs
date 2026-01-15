@@ -3,6 +3,7 @@
  * This module contains all data transfer objects (DTOs) and response structures
  * used across the authentication service.
  */
+use rocket::form::FromForm;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -159,4 +160,16 @@ pub struct UserInfo {
     pub preferred_username: Option<String>,
     pub given_name: Option<String>,
     pub family_name: Option<String>,
+}
+
+/**
+ * OAuth2 callback query parameters.
+ * Received from Keycloak after user authentication.
+ */
+#[derive(Debug, Deserialize, FromForm)]
+pub struct AuthCallback {
+    /// Authorization code from Keycloak
+    pub code: String,
+    /// State parameter for CSRF protection
+    pub state: Option<String>,
 }

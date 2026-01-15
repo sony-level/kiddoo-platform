@@ -90,8 +90,5 @@ pub mod kidoo {
         }
     }
 
-    diesel::allow_tables_to_appear_in_same_query!(
-        profiles,
-        users,
-    );
+    diesel::allow_tables_to_appear_in_same_query!(profiles, users);
 }

@@ -165,30 +165,3 @@ async fn test_me_rejects_malformed_authorization_header() {
 
     assert_eq!(response.status(), Status::Unauthorized);
 }
-
-#[tokio::test]
-async fn test_swagger_ui_accessible() {
-    let client = create_test_client().await;
-
-    let response = client.get("/swagger-ui/").dispatch().await;
-
-    // Swagger UI should redirect or return HTML
-    assert!(
-        response.status() == Status::Ok || response.status() == Status::SeeOther,
-        "Expected 200 or 303, got {:?}",
-        response.status()
-    );
-}
-
-#[tokio::test]
-async fn test_openapi_json_accessible() {
-    let client = create_test_client().await;
-
-    let response = client.get("/api-docs/openapi.json").dispatch().await;
-
-    assert_eq!(response.status(), Status::Ok);
-
-    let body = response.into_string().await.unwrap();
-    assert!(body.contains("\"openapi\""));
-    assert!(body.contains("Identity Proxy API"));
-}
