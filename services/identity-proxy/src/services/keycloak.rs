@@ -24,6 +24,10 @@ struct TokenRequest<'a> {
     password: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     refresh_token: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    redirect_uri: Option<&'a str>,
 }
 
 /**
@@ -85,6 +89,8 @@ impl KeycloakService {
             username: Some(username),
             password: Some(password),
             refresh_token: None,
+            code: None,
+            redirect_uri: None,
         };
 
         self.request_token(request).await
@@ -109,9 +115,69 @@ impl KeycloakService {
             username: None,
             password: None,
             refresh_token: Some(refresh_token),
+            code: None,
+            redirect_uri: None,
         };
 
         self.request_token(request).await
+    }
+
+    /**
+     * Exchanges an authorization code for tokens.
+     * Used in the OAuth2 Authorization Code Flow after user redirects back from Keycloak.
+     *
+     * # Arguments
+     * * `code` - Authorization code received from Keycloak callback
+     *
+     * # Returns
+     * * `Ok(TokenResponse)` - JWT tokens on success
+     * * `Err(AuthError)` - Error if code is invalid
+     */
+    pub async fn exchange_code(&self, code: &str) -> Result<TokenResponse, AuthError> {
+        let request = TokenRequest {
+            grant_type: "authorization_code",
+            client_id: &self.config.keycloak_client_id,
+            client_secret: &self.config.keycloak_client_secret,
+            username: None,
+            password: None,
+            refresh_token: None,
+            code: Some(code),
+            redirect_uri: Some(&self.config.redirect_uri),
+        };
+
+        self.request_token(request).await
+    }
+
+    /**
+     * Generates the Keycloak authorization URL for OAuth2 login.
+     * Redirects user to Keycloak login page.
+     *
+     * # Arguments
+     * * `state` - Optional state parameter for CSRF protection
+     *
+     * # Returns
+     * * `String` - Full authorization URL to redirect user to
+     */
+    pub fn get_authorization_url(&self, state: Option<&str>) -> String {
+        let mut url = format!(
+            "{}?client_id={}&redirect_uri={}&response_type=code&scope=openid%20profile%20email",
+            self.config.authorization_url(),
+            self.config.keycloak_client_id,
+            urlencoding::encode(&self.config.redirect_uri)
+        );
+
+        if let Some(s) = state {
+            url.push_str(&format!("&state={}", urlencoding::encode(s)));
+        }
+
+        url
+    }
+
+    /**
+     * Returns the frontend URL for redirecting after authentication.
+     */
+    pub fn get_frontend_url(&self) -> &str {
+        &self.config.frontend_url
     }
 
     /**
