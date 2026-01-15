@@ -7,10 +7,12 @@
  *
  * | Method | Endpoint          | Security    | Description                    |
  * |--------|-------------------|-------------|--------------------------------|
- * | POST   | /auth/login       | Public      | Authenticate user              |
+ * | GET    | /auth/authorize   | Public      | Redirect to Keycloak login     |
+ * | GET    | /auth/callback    | Public      | OAuth2 callback from Keycloak  |
+ * | POST   | /auth/login       | Public      | Direct login (password grant)  |
  * | POST   | /auth/refresh     | Public      | Refresh access token           |
  * | POST   | /auth/logout      | Public      | Invalidate refresh token       |
- * | POST   | /auth/me          |   JWT      | Get authenticated user profile |
+ * | POST   | /auth/me          | JWT         | Get authenticated user profile |
  */
 use crate::errors::{AuthError, ErrorResponse};
 use crate::middleware::JwtGuard;
@@ -18,11 +20,76 @@ use crate::models::{
     LoginRequest, LoginResponse, LogoutRequest, MessageResponse, RefreshRequest, UserResponse,
 };
 use crate::services::KeycloakService;
+use rocket::response::Redirect;
 use rocket::serde::json::Json;
-use rocket::{State, post};
+use rocket::{State, get, post};
 
 /**
- * Authenticates a user with email and password.
+ * Initiates OAuth2 Authorization Code Flow.
+ * Redirects user to Keycloak login page.
+ */
+#[utoipa::path(
+    get,
+    path = "/auth/authorize",
+    tag = "auth",
+    responses(
+        (status = 302, description = "Redirect to Keycloak login page")
+    )
+)]
+#[get("/auth/authorize")]
+pub fn authorize(keycloak: &State<KeycloakService>) -> Redirect {
+    let auth_url = keycloak.get_authorization_url(Some("kidoo"));
+    Redirect::to(auth_url)
+}
+
+/**
+ * OAuth2 callback endpoint.
+ * Receives authorization code from Keycloak and exchanges it for tokens.
+ * Redirects to frontend with tokens in URL fragment.
+ */
+#[utoipa::path(
+    get,
+    path = "/auth/callback",
+    tag = "auth",
+    params(
+        ("code" = String, Query, description = "Authorization code from Keycloak"),
+        ("state" = Option<String>, Query, description = "State parameter for CSRF protection")
+    ),
+    responses(
+        (status = 302, description = "Redirect to frontend with tokens"),
+        (status = 401, description = "Invalid authorization code", body = ErrorResponse)
+    )
+)]
+#[get("/auth/callback?<code>&<state>")]
+pub async fn callback(
+    keycloak: &State<KeycloakService>,
+    code: String,
+    #[allow(unused_variables)] state: Option<String>,
+) -> Result<Json<LoginResponse>, AuthError> {
+    let tokens = keycloak.exchange_code(&code).await?;
+    Ok(Json(LoginResponse {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_in: tokens.expires_in,
+        token_type: tokens.token_type,
+    }))
+
+    // Redirect to frontend with tokens in URL fragment (more secure than query params)
+    //    let frontend_url = keycloak.get_frontend_url();
+    //    let redirect_url = format!(
+    //        "{}/#access_token={}&refresh_token={}&expires_in={}&token_type={}",
+    //        frontend_url,
+    //        tokens.access_token,
+    //        tokens.refresh_token,
+    //        tokens.expires_in,
+    //        tokens.token_type
+    //    );
+
+    //    Ok(Redirect::to(redirect_url))
+}
+
+/**
+ * Authenticates a user with email and password (Direct Access Grant).
  * Sends credentials to Keycloak and returns JWT tokens on success.
  */
 #[utoipa::path(
