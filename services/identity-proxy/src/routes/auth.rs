@@ -38,7 +38,7 @@ use rocket::{State, get, post};
 )]
 #[get("/auth/authorize")]
 pub fn authorize(keycloak: &State<KeycloakService>) -> Redirect {
-    let auth_url = keycloak.get_authorization_url(Some("kidoo"));
+    let auth_url = keycloak.get_authorization_url(Some(&keycloak.config.oauth_state));
     Redirect::to(auth_url)
 }
 
@@ -193,7 +193,7 @@ pub async fn logout(
 #[post("/auth/me")]
 pub async fn me(user: JwtGuard) -> Json<UserResponse> {
     Json(UserResponse {
-        id: user.user_id.to_string(),
+        id: user.kc_sub,
         email: user.email,
         username: user.username,
         roles: user.roles,
