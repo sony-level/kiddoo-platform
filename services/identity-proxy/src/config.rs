@@ -1,10 +1,6 @@
 use serde::Deserialize;
 use std::env;
 
-
-
-
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub keycloak_url: String,
