@@ -5,6 +5,7 @@
  */
 use rocket::form::FromForm;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use utoipa::ToSchema;
 
 /**
@@ -117,11 +118,21 @@ pub struct HealthResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
+    pub iss: Option<String>,
+    pub aud: Option<AudClaim>,
     pub exp: usize,
     pub iat: usize,
     pub email: Option<String>,
     pub preferred_username: Option<String>,
     pub realm_access: Option<RealmAccess>,
+    pub resource_access: Option<HashMap<String, ResourceAccess>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AudClaim {
+    Single(String),
+    Multiple(Vec<String>),
 }
 
 /**
@@ -130,6 +141,11 @@ pub struct Claims {
  */
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RealmAccess {
+    pub roles: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResourceAccess {
     pub roles: Vec<String>,
 }
 

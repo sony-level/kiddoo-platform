@@ -18,7 +18,14 @@ fn init_test_env() {
             std::env::set_var("KEYCLOAK_REALM", "test");
             std::env::set_var("KEYCLOAK_CLIENT_ID", "test-client");
             std::env::set_var("KEYCLOAK_CLIENT_SECRET", "test-secret");
-            std::env::set_var("JWT_SECRET", "test-jwt-secret-key-min-32-chars!!");
+
+            std::env::set_var("KC_ISSUER", "http://localhost:8080/realms/test");
+            std::env::set_var(
+                "KC_JWKS_URL",
+                "http://localhost:8080/realms/test/protocol/openid-connect/certs",
+            );
+            std::env::set_var("KC_AUDIENCE", "test-client");
+            std::env::set_var("KC_CLIENT_ID", "test-client");
         }
     });
 }
