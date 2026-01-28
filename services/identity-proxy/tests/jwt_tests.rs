@@ -636,18 +636,11 @@ async fn test_invalid_audience() {
     );
 }
 
-#[tokio::test]
-async fn test_extract_roles_from_realm_access() {
-    let mock_server = MockServer::start().await;
-    
-    Mock::given(method("GET"))
-        .and(path("/jwks"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
-        .mount(&mock_server)
-        .await;
-
+#[test]
+fn test_extract_roles_from_realm_access() {
+    // Create verifier with dummy URLs since we're only testing extract_roles
     let verifier = JwksVerifier::new(
-        format!("{}/jwks", mock_server.uri()),
+        "http://localhost/jwks".to_string(),
         "https://test-issuer.com".to_string(),
         "test-audience".to_string(),
         "test-client".to_string(),
@@ -665,18 +658,11 @@ async fn test_extract_roles_from_realm_access() {
     assert!(roles.contains(&"user".to_string()));
 }
 
-#[tokio::test]
-async fn test_extract_roles_from_resource_access() {
-    let mock_server = MockServer::start().await;
-    
-    Mock::given(method("GET"))
-        .and(path("/jwks"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
-        .mount(&mock_server)
-        .await;
-
+#[test]
+fn test_extract_roles_from_resource_access() {
+    // Create verifier with dummy URLs since we're only testing extract_roles
     let verifier = JwksVerifier::new(
-        format!("{}/jwks", mock_server.uri()),
+        "http://localhost/jwks".to_string(),
         "https://test-issuer.com".to_string(),
         "test-audience".to_string(),
         "test-client".to_string(),
@@ -699,18 +685,11 @@ async fn test_extract_roles_from_resource_access() {
     assert!(roles.contains(&"client-role".to_string()));
 }
 
-#[tokio::test]
-async fn test_extract_roles_deduplication() {
-    let mock_server = MockServer::start().await;
-    
-    Mock::given(method("GET"))
-        .and(path("/jwks"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
-        .mount(&mock_server)
-        .await;
-
+#[test]
+fn test_extract_roles_deduplication() {
+    // Create verifier with dummy URLs since we're only testing extract_roles
     let verifier = JwksVerifier::new(
-        format!("{}/jwks", mock_server.uri()),
+        "http://localhost/jwks".to_string(),
         "https://test-issuer.com".to_string(),
         "test-audience".to_string(),
         "test-client".to_string(),
