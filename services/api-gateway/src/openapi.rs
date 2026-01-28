@@ -56,7 +56,7 @@ use crate::routes;
     ),
     tags(
         (name = "health", description = "Health check endpoints"),
-        (name = "auth", description = "Authentication endpoints")
+        (name = "Identity Proxy", description = "Authentication endpoints")
     ),
     modifiers(&SecurityAddon)
 )]

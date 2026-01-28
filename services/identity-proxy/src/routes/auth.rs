@@ -31,14 +31,14 @@ use rocket::{State, get, post};
 #[utoipa::path(
     get,
     path = "/auth/authorize",
-    tag = "auth",
+    tag = "Identity Proxy",
     responses(
         (status = 302, description = "Redirect to Keycloak login page")
     )
 )]
 #[get("/auth/authorize")]
 pub fn authorize(keycloak: &State<KeycloakService>) -> Redirect {
-    let auth_url = keycloak.get_authorization_url(Some("kidoo"));
+    let auth_url = keycloak.get_authorization_url(Some(&keycloak.config.oauth_state));
     Redirect::to(auth_url)
 }
 
@@ -50,7 +50,7 @@ pub fn authorize(keycloak: &State<KeycloakService>) -> Redirect {
 #[utoipa::path(
     get,
     path = "/auth/callback",
-    tag = "auth",
+    tag = "Identity Proxy",
     params(
         ("code" = String, Query, description = "Authorization code from Keycloak"),
         ("state" = Option<String>, Query, description = "State parameter for CSRF protection")
@@ -95,7 +95,7 @@ pub async fn callback(
 #[utoipa::path(
     post,
     path = "/auth/login",
-    tag = "auth",
+    tag = "Identity Proxy",
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Successfully authenticated", body = LoginResponse),
@@ -125,7 +125,7 @@ pub async fn login(
 #[utoipa::path(
     post,
     path = "/auth/refresh",
-    tag = "auth",
+    tag = "Identity Proxy",
     request_body = RefreshRequest,
     responses(
         (status = 200, description = "Token refreshed successfully", body = LoginResponse),
@@ -155,7 +155,7 @@ pub async fn refresh(
 #[utoipa::path(
     post,
     path = "/auth/logout",
-    tag = "auth",
+    tag = "Identity Proxy",
     request_body = LogoutRequest,
     responses(
         (status = 200, description = "Successfully logged out", body = MessageResponse),
@@ -181,7 +181,7 @@ pub async fn logout(
 #[utoipa::path(
     post,
     path = "/auth/me",
-    tag = "auth",
+    tag = "Identity Proxy",
     security(
         ("bearer_auth" = [])
     ),
@@ -193,7 +193,7 @@ pub async fn logout(
 #[post("/auth/me")]
 pub async fn me(user: JwtGuard) -> Json<UserResponse> {
     Json(UserResponse {
-        id: user.user_id.to_string(),
+        id: user.kc_sub,
         email: user.email,
         username: user.username,
         roles: user.roles,

@@ -1,0 +1,13 @@
+[package]
+name = "orchestrator"
+description.workspace = true
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ctrlc = { version = "3.4", features = ["termination"] }
+
+[[bin]]
+name = "orchestrator"
+path = "src/main.rs"

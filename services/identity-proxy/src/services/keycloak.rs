@@ -45,7 +45,7 @@ struct KeycloakError {
  * Handles all communication with the Keycloak server for authentication operations.
  */
 pub struct KeycloakService {
-    config: Config,
+    pub config: Config,
     client: Client,
 }
 
