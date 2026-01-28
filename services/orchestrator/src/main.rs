@@ -32,12 +32,12 @@ fn main() {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
-    println!("\n Shutting down services...");
+    println!("\nShutting down services...");
     let _ = api_gateway.kill();
     let _ = api_gateway.wait();
     let _ = identity_proxy.kill();
     let _ = identity_proxy.wait();
-    println!(" Goodbye!");
+    println!("Goodbye!");
 }
 
 fn start_service(name: &str, port: u16) -> Child {
