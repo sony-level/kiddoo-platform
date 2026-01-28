@@ -168,12 +168,12 @@ impl JwksVerifier {
         }
 
         let refreshed = self.refresh_jwks().await?;
-        let key = refreshed
-            .keys_by_kid
-            .get(kid)
-            .ok_or(AuthError::InvalidToken)?
-            .clone();
+        // Attempt to find the key in the refreshed JWKS before updating the cache.
+        // We always cache the refreshed JWKS, even if the specific `kid` is missing,
+        // to avoid repeatedly refreshing on subsequent requests with the same unknown `kid`.
+        let key = refreshed.keys_by_kid.get(kid).cloned();
         *cache = Some(refreshed);
+        let key = key.ok_or(AuthError::InvalidToken)?;
         Ok(key)
     }
 
