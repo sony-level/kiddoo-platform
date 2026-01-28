@@ -16,11 +16,16 @@ fn main() {
     // Start identity-proxy first (api-gateway depends on it)
     let mut identity_proxy = start_service("identity-proxy", 8001);
 
-    // Wait a bit for identity-proxy to start
+    // Wait a bit for identity-proxy to start, then verify it's running
     std::thread::sleep(std::time::Duration::from_secs(3));
+    verify_service_running(&mut identity_proxy, "identity-proxy");
 
     // Start api-gateway
     let mut api_gateway = start_service("api-gateway", 8000);
+
+    // Wait a bit for api-gateway to start, then verify it's running
+    std::thread::sleep(std::time::Duration::from_secs(3));
+    verify_service_running(&mut api_gateway, "api-gateway");
 
     println!("✅ All services started!");
     println!("   - API Gateway: http://127.0.0.1:8000");
@@ -49,4 +54,21 @@ fn start_service(name: &str, port: u16) -> Child {
         .stderr(Stdio::inherit())
         .spawn()
         .unwrap_or_else(|_| panic!("Failed to start {}", name))
+}
+
+fn verify_service_running(child: &mut Child, name: &str) {
+    match child.try_wait() {
+        Ok(Some(status)) => {
+            panic!(
+                "❌ Service '{}' exited unexpectedly with status: {}",
+                name, status
+            );
+        }
+        Ok(None) => {
+            println!("✓ Service '{}' is running", name);
+        }
+        Err(e) => {
+            panic!("❌ Failed to check status of service '{}': {}", name, e);
+        }
+    }
 }
