@@ -24,18 +24,7 @@ updates:
       prefix: "ci"
       include: "scope"
 
-  # Update Rust dependencies for each workspace member
-  - package-ecosystem: "cargo"
-    directory: "/libs/database"
-    schedule:
-      interval: "monthly"
-      day: "monday"
-      time: "09:30"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps"
-      include: "scope"
-      
+  # Update Rust dependencies for selected services
   - package-ecosystem: "cargo"
     directory: "/services/api-gateway"
     schedule:
