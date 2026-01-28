@@ -26,6 +26,7 @@ fn init_test_env() {
             );
             std::env::set_var("KC_AUDIENCE", "test-client");
             std::env::set_var("KC_CLIENT_ID", "test-client");
+            std::env::set_var("OAUTH_STATE", "test-state");
         }
     });
 }
