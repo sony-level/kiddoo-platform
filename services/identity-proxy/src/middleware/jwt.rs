@@ -74,7 +74,13 @@ impl JwksVerifier {
         let http = Client::builder()
             .timeout(Duration::from_secs(10))
             .build()
-            .expect("Failed to create HTTP client");
+            .unwrap_or_else(|err| {
+                eprintln!(
+                    "Failed to create configured HTTP client ({}); falling back to default client",
+                    err
+                );
+                Client::new()
+            });
 
         Self {
             jwks_url,
