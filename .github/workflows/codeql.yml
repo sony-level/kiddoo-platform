@@ -41,5 +41,4 @@ jobs:
           category: "/language:${{ matrix.language }}" # CodeQL category for Rust
           upload: true # Upload results to GitHub for security analysis
           output: sarif-results
-          
-          
+
