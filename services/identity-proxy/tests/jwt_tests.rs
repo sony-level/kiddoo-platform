@@ -6,7 +6,7 @@
 use base64::Engine;
 use identity_proxy::middleware::jwt::JwksVerifier;
 use identity_proxy::models::{AudClaim, Claims, RealmAccess, ResourceAccess};
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -71,12 +71,12 @@ fn create_test_claims(issuer: &str, audience: &str, exp_offset: i64) -> Claims {
 
 /// Creates a JWT token with the given claims and kid
 fn create_token(claims: &Claims, kid: &str) -> String {
-    let encoding_key = EncodingKey::from_rsa_pem(TEST_PRIVATE_KEY.as_bytes())
-        .expect("Failed to load test key");
-    
+    let encoding_key =
+        EncodingKey::from_rsa_pem(TEST_PRIVATE_KEY.as_bytes()).expect("Failed to load test key");
+
     let mut header = Header::new(Algorithm::RS256);
     header.kid = Some(kid.to_string());
-    
+
     encode(&header, claims, &encoding_key).expect("Failed to encode token")
 }
 
@@ -98,7 +98,7 @@ fn create_jwks_json(kid: &str) -> serde_json::Value {
 async fn test_successful_token_verification() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -131,7 +131,7 @@ async fn test_successful_token_verification() {
 async fn test_expired_token() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -168,7 +168,7 @@ async fn test_expired_token() {
 async fn test_invalid_signature() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -187,7 +187,7 @@ async fn test_invalid_signature() {
     // Create token and tamper with signature
     let claims = create_test_claims("https://test-issuer.com", "test-audience", 3600);
     let token = create_token(&claims, "test-key-1");
-    
+
     // Tamper with the signature
     let parts: Vec<&str> = token.split('.').collect();
     let tampered_token = format!("{}.{}.{}tampered", parts[0], parts[1], parts[2]);
@@ -208,7 +208,7 @@ async fn test_invalid_signature() {
 async fn test_missing_kid_header() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -226,8 +226,8 @@ async fn test_missing_kid_header() {
 
     // Create token without kid in header
     let claims = create_test_claims("https://test-issuer.com", "test-audience", 3600);
-    let encoding_key = EncodingKey::from_rsa_pem(TEST_PRIVATE_KEY.as_bytes())
-        .expect("Failed to load test key");
+    let encoding_key =
+        EncodingKey::from_rsa_pem(TEST_PRIVATE_KEY.as_bytes()).expect("Failed to load test key");
     let header = Header::new(Algorithm::RS256); // No kid set
     let token = encode(&header, &claims, &encoding_key).expect("Failed to encode");
 
@@ -247,7 +247,7 @@ async fn test_missing_kid_header() {
 async fn test_unknown_kid() {
     // Setup mock JWKS server with one key
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("known-key")))
@@ -283,7 +283,7 @@ async fn test_unknown_kid() {
 async fn test_cache_expiration() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -322,7 +322,7 @@ async fn test_cache_expiration() {
 async fn test_cache_hit() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -349,7 +349,10 @@ async fn test_cache_hit() {
 
     // Second verification - should use cached JWKS
     let result2 = verifier.verify(&token).await;
-    assert!(result2.is_ok(), "Second verification should succeed with cache");
+    assert!(
+        result2.is_ok(),
+        "Second verification should succeed with cache"
+    );
 
     // Mock expectations are verified automatically
 }
@@ -358,7 +361,7 @@ async fn test_cache_hit() {
 async fn test_key_rotation() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     // Initially serve JWKS with only the first key
     Mock::given(method("GET"))
         .and(path("/jwks"))
@@ -416,7 +419,10 @@ async fn test_key_rotation() {
     // Verify token with new key
     let token2 = create_token(&claims, "test-key-2");
     let result2 = verifier.verify(&token2).await;
-    assert!(result2.is_ok(), "New key verification should succeed after rotation");
+    assert!(
+        result2.is_ok(),
+        "New key verification should succeed after rotation"
+    );
 }
 
 #[tokio::test]
@@ -445,7 +451,10 @@ async fn test_malformed_jwks_response() {
 
     // Verify token should fail due to malformed JWKS
     let result = verifier.verify(&token).await;
-    assert!(result.is_err(), "Malformed JWKS should cause verification to fail");
+    assert!(
+        result.is_err(),
+        "Malformed JWKS should cause verification to fail"
+    );
 
     let error = result.unwrap_err();
     assert!(
@@ -472,7 +481,10 @@ async fn test_network_failure_during_jwks_fetch() {
 
     // Verify token should fail due to network error
     let result = verifier.verify(&token).await;
-    assert!(result.is_err(), "Network failure should cause verification to fail");
+    assert!(
+        result.is_err(),
+        "Network failure should cause verification to fail"
+    );
 
     let error = result.unwrap_err();
     assert!(
@@ -508,7 +520,10 @@ async fn test_jwks_server_error_response() {
 
     // Verify token should fail due to server error
     let result = verifier.verify(&token).await;
-    assert!(result.is_err(), "Server error should cause verification to fail");
+    assert!(
+        result.is_err(),
+        "Server error should cause verification to fail"
+    );
 
     let error = result.unwrap_err();
     assert!(
@@ -522,7 +537,7 @@ async fn test_jwks_server_error_response() {
 async fn test_invalid_algorithm() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -541,15 +556,15 @@ async fn test_invalid_algorithm() {
     // Create token with RS256 and manually modify header to claim HS256
     let claims = create_test_claims("https://test-issuer.com", "test-audience", 3600);
     let token = create_token(&claims, "test-key-1");
-    
+
     // Parse and modify the header to claim HS256
     let parts: Vec<&str> = token.split('.').collect();
     let mut modified_header = Header::new(Algorithm::HS256);
     modified_header.kid = Some("test-key-1".to_string());
     let header_json = serde_json::to_string(&modified_header).unwrap();
-    let modified_header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(header_json.as_bytes());
-    
+    let modified_header_b64 =
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(header_json.as_bytes());
+
     let modified_token = format!("{}.{}.{}", modified_header_b64, parts[1], parts[2]);
 
     // Verify should fail due to algorithm mismatch
@@ -568,7 +583,7 @@ async fn test_invalid_algorithm() {
 async fn test_invalid_issuer() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -604,7 +619,7 @@ async fn test_invalid_issuer() {
 async fn test_invalid_audience() {
     // Setup mock JWKS server
     let mock_server = MockServer::start().await;
-    
+
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(create_jwks_json("test-key-1")))
@@ -697,12 +712,12 @@ fn test_extract_roles_deduplication() {
     );
 
     let mut claims = create_test_claims("https://test-issuer.com", "test-audience", 3600);
-    
+
     // Add same role in both realm and resource access
     claims.realm_access = Some(RealmAccess {
         roles: vec!["admin".to_string(), "user".to_string()],
     });
-    
+
     let mut resource_access = HashMap::new();
     resource_access.insert(
         "test-client".to_string(),
@@ -713,22 +728,29 @@ fn test_extract_roles_deduplication() {
     claims.resource_access = Some(resource_access);
 
     let roles = verifier.extract_roles(&claims);
-    
+
     // Should have 3 unique roles (admin should not be duplicated)
     assert_eq!(roles.len(), 3);
     assert!(roles.contains(&"admin".to_string()));
     assert!(roles.contains(&"user".to_string()));
     assert!(roles.contains(&"developer".to_string()));
-    
+
     // Verify roles are sorted
-    assert_eq!(roles, vec!["admin".to_string(), "developer".to_string(), "user".to_string()]);
+    assert_eq!(
+        roles,
+        vec![
+            "admin".to_string(),
+            "developer".to_string(),
+            "user".to_string()
+        ]
+    );
 }
 
 #[tokio::test]
 async fn test_jwks_with_non_rsa_keys() {
     // Setup mock JWKS server with mixed key types
     let mock_server = MockServer::start().await;
-    
+
     let mixed_jwks = json!({
         "keys": [
             {
@@ -769,14 +791,17 @@ async fn test_jwks_with_non_rsa_keys() {
 
     // Should successfully verify with RSA key, ignoring EC key
     let result = verifier.verify(&token).await;
-    assert!(result.is_ok(), "Should verify with RSA key despite EC key presence");
+    assert!(
+        result.is_ok(),
+        "Should verify with RSA key despite EC key presence"
+    );
 }
 
 #[tokio::test]
 async fn test_jwks_with_missing_components() {
     // Setup mock JWKS server with incomplete RSA keys
     let mock_server = MockServer::start().await;
-    
+
     let incomplete_jwks = json!({
         "keys": [
             {
@@ -827,5 +852,8 @@ async fn test_jwks_with_missing_components() {
 
     // Should successfully verify with complete key
     let result = verifier.verify(&token).await;
-    assert!(result.is_ok(), "Should verify with complete RSA key despite incomplete keys");
+    assert!(
+        result.is_ok(),
+        "Should verify with complete RSA key despite incomplete keys"
+    );
 }
