@@ -27,7 +27,7 @@ fn main() {
     std::thread::sleep(std::time::Duration::from_secs(3));
     verify_service_running(&mut api_gateway, "api-gateway");
 
-    println!("✅ All services started!");
+    println!(" All services started!");
     println!("   - API Gateway: http://127.0.0.1:8000");
     println!("   - Identity Proxy: http://127.0.0.1:8001");
     println!("   - Swagger UI: http://127.0.0.1:8000/swagger-ui/");
@@ -46,8 +46,7 @@ fn main() {
 }
 
 fn start_service(name: &str, port: u16) -> Child {
-    Command::new("cargo")
-        .args(["run", "-p", name])
+    Command::new("cargo").args(["run", "-p", name])
         .env("ROCKET_PORT", port.to_string())
         .env("ROCKET_ADDRESS", "127.0.0.1")
         .stdout(Stdio::inherit())
