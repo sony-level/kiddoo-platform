@@ -46,7 +46,8 @@ fn main() {
 }
 
 fn start_service(name: &str, port: u16) -> Child {
-    Command::new("cargo").args(["run", "-p", name])
+    Command::new("cargo")
+        .args(["run", "-p", name])
         .env("ROCKET_PORT", port.to_string())
         .env("ROCKET_ADDRESS", "127.0.0.1")
         .stdout(Stdio::inherit())
