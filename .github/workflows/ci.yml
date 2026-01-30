@@ -4,8 +4,8 @@ on:
   push:
     branches: 
       - develop
-      - feature/*
-      - hotfix/*
+      - feature
+      - hotfix
   pull_request:
     branches:
       - master
