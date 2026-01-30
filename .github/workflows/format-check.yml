@@ -1,15 +1,7 @@
 name: Code Formatting Check
 
 on:
-  push:
-    branches: 
-      - develop
-      - feature
-      - hotfix
-  pull_request:
-    branches:
-      - master
-      - develop
+  workflow_call:
   workflow_dispatch:
 
 jobs:
