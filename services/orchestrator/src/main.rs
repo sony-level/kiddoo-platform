@@ -11,7 +11,7 @@ fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    println!("🚀 Starting Kidoo services...");
+    println!(" Starting Kiddoo services...");
 
     // Start identity-proxy first (api-gateway depends on it)
     let mut identity_proxy = start_service("identity-proxy", 8001);
@@ -28,9 +28,9 @@ fn main() {
     verify_service_running(&mut api_gateway, "api-gateway");
 
     println!(" All services started!");
-    println!("   - API Gateway: http://127.0.0.1:8000");
-    println!("   - Identity Proxy: http://127.0.0.1:8001");
-    println!("   - Swagger UI: http://127.0.0.1:8000/swagger-ui/");
+    println!("   - API Gateway: http://0.0.0.0:8000");
+    println!("   - Identity Proxy: http://0.0.0.0:8001");
+    println!("   - Swagger UI: http://0.0.0.0:8000/api/v1/swagger-ui/");
 
     // Wait for Ctrl+C
     while running.load(Ordering::SeqCst) {
@@ -49,7 +49,7 @@ fn start_service(name: &str, port: u16) -> Child {
     Command::new("cargo")
         .args(["run", "-p", name])
         .env("ROCKET_PORT", port.to_string())
-        .env("ROCKET_ADDRESS", "127.0.0.1")
+        .env("ROCKET_ADDRESS", "0.0.0.0")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
@@ -60,15 +60,15 @@ fn verify_service_running(child: &mut Child, name: &str) {
     match child.try_wait() {
         Ok(Some(status)) => {
             panic!(
-                "❌ Service '{}' exited unexpectedly with status: {}",
+                " Service '{}' exited unexpectedly with status: {}",
                 name, status
             );
         }
         Ok(None) => {
-            println!("✓ Service '{}' is running", name);
+            println!(" Service '{}' is running", name);
         }
         Err(e) => {
-            panic!("❌ Failed to check status of service '{}': {}", name, e);
+            panic!(" Failed to check status of service '{}': {}", name, e);
         }
     }
 }
