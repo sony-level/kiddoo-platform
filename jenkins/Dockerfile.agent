@@ -1,4 +1,6 @@
-FROM rust:1.85-bookworm
+FROM rust:1-trixie
+
+LABEL maintainer="sony-level"
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -31,6 +33,7 @@ RUN wget -q "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/son
     && rm "sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip"
 
 RUN rustup component add clippy rustfmt
-RUN cargo install cargo-audit diesel_cli --no-default-features --features postgres
+RUN cargo install cargo-audit
+RUN cargo install diesel_cli --no-default-features --features postgres
 
 WORKDIR /app
