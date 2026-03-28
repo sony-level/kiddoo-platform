@@ -4,6 +4,7 @@ debug
 .idea
 target/
 *.lock
+.idea
 
 Agent.md
 
@@ -17,11 +18,11 @@ Agent.md
 # Contains mutation testing data
 **/mutants.out*/
 
-#environement variables
-³.env
+# Environment variables
+.env
 .env.local
+.env.production
 !.env.example
-.env 
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
