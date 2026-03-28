@@ -12,9 +12,11 @@
 
 pipeline {
     agent {
-        dockerfile {
-            filename 'jenkins/Dockerfile.agent'
+        docker {
+            image 'ghcr.io/sony-level/kiddoo-jenkins-agent:latest'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
+            registryUrl 'https://ghcr.io'
+            registryCredentialsId 'ghcr-token'
         }
     }
 
