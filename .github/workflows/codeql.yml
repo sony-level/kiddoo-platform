@@ -2,9 +2,9 @@ name: "CodeQL Analysis"
 
 on:
   push:
-    branches: [release]
+    branches: [release, "**"]
   pull_request:
-    branches: [release]
+    branches: [release, "**"]
   schedule:
     - cron: "0 6 * * 1" # Run every Monday at 6 AM UTC
 
@@ -41,4 +41,3 @@ jobs:
           category: "/language:${{ matrix.language }}" # CodeQL category for Rust
           upload: true # Upload results to GitHub for security analysis
           output: sarif-results
-
