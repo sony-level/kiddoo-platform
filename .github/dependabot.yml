@@ -1,0 +1,59 @@
+version: 2
+updates:
+  # Update Rust dependencies monthly
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    
+  # Update GitHub Actions monthly
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # Update Rust dependencies for selected services
+  - package-ecosystem: "cargo"
+    directory: "/services/api-gateway"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "10:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+      
+  - package-ecosystem: "cargo"
+    directory: "/services/identity-proxy"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "10:30"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+      
+  - package-ecosystem: "cargo"
+    directory: "/services/orchestrator"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "11:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      include: "scope"
