@@ -111,6 +111,11 @@ pipeline {
                     echo "Migrations applied successfully"
                 '''
             }
+            post {
+                always {
+                    sh 'docker rm -f kiddoo-pg-test || true'
+                }
+            }
         }
 
         stage('Test') {
@@ -491,8 +496,9 @@ pipeline {
             }
         }
         always {
-            sh 'docker rm -f kiddoo-pg-test || true'
-            cleanWs()
+            script {
+                try { cleanWs() } catch (e) { echo "Workspace cleanup skipped: ${e.message}" }
+            }
         }
     }
 }
