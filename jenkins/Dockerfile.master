@@ -1,5 +1,7 @@
 FROM jenkins/jenkins:lts-jdk17
 
+LABEL maintainer="sony-level"
+
 USER root
 
 # Install Docker CLI so Jenkins master can build/run agent containers

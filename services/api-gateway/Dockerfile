@@ -1,4 +1,6 @@
-FROM rust:1.85-bookworm AS builder
+FROM rust:1-trixie AS builder
+
+LABEL maintainer="sony-level"
 
 WORKDIR /app
 COPY . .
