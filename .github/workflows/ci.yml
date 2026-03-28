@@ -1,21 +1,64 @@
-name: CI 
+# =============================================================================
+# GitHub Actions — PR Validation (before merge)
+#
+# Role: Fast feedback on PRs. Validates code quality before merge.
+# Jenkins handles: build, Docker, SonarQube, Trivy, deploy (after merge).
+# =============================================================================
+name: PR Validation
 
 on:
   push:
-    branches: 
-      - "feature"
+    branches:
       - "feature/*"
       - "bugfix/*"
+      - "hotfix/*"
   pull_request:
-    branches: 
+    branches:
       - "develop"
       - "release"
+      - "release/*"
       - "master"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # -------------------------------------------------------------------
+  # Lint: format + clippy
+  # -------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-lint-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace -- -D warnings
+
+  # -------------------------------------------------------------------
+  # Unit + integration tests (lightweight)
+  # -------------------------------------------------------------------
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -49,40 +92,48 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-test-
 
-      - name: Set up environment
-        run: |
-          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/test_db" >> $GITHUB_ENV
+      - name: Install Diesel CLI
+        run: cargo install diesel_cli --no-default-features --features postgres
+
+      - name: Run migrations
+        run: cd libs/database && diesel migration run
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
 
       - name: Run tests
         run: cargo test --workspace --verbose
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
 
-  lint:
-    name: Lint
+  # -------------------------------------------------------------------
+  # Secret scan (prevent accidental credential leaks)
+  # -------------------------------------------------------------------
+  secret-scan:
+    name: Secret Scan
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          fetch-depth: 0
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run Clippy
-        run: cargo clippy --workspace -- -D warnings
-
-  build:
-    name: Build
+  # -------------------------------------------------------------------
+  # Quick build validation (compile check only)
+  # -------------------------------------------------------------------
+  build-check:
+    name: Build Check
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [lint, test]
 
     steps:
       - name: Checkout code
@@ -98,9 +149,50 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-build-
 
-      - name: Build release
+      - name: Build check
         run: cargo build --workspace --release
+
+  # -------------------------------------------------------------------
+  # Discord notification (PR validation result)
+  # -------------------------------------------------------------------
+  notify:
+    name: Discord Notify
+    runs-on: ubuntu-latest
+    needs: [lint, test, secret-scan, build-check]
+    if: always()
+
+    steps:
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ "${{ needs.build-check.result }}" = "success" ] && \
+             [ "${{ needs.lint.result }}" = "success" ] && \
+             [ "${{ needs.test.result }}" = "success" ] && \
+             [ "${{ needs.secret-scan.result }}" = "success" ]; then
+            COLOR=3066993
+            STATUS="✅ PR Validation PASSED"
+          else
+            COLOR=15158332
+            STATUS="❌ PR Validation FAILED"
+          fi
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "embeds": [{
+              "title": "$STATUS",
+              "description": "**${{ github.repository }}**\nPR: #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}\nBranch: \`${{ github.head_ref }}\` → \`${{ github.base_ref }}\`\nAuthor: ${{ github.actor }}",
+              "url": "${{ github.event.pull_request.html_url }}",
+              "color": $COLOR,
+              "footer": { "text": "GitHub Actions — PR Validation" },
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+          )
+
+          curl -s -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK"
