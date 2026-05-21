@@ -11,7 +11,7 @@ fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    println!("🚀 Starting Kidoo services...");
+    println!("Starting Kidoo services...");
 
     // Start identity-proxy first (api-gateway depends on it)
     let mut identity_proxy = start_service("identity-proxy", 8001);
@@ -22,7 +22,7 @@ fn main() {
     // Start api-gateway
     let mut api_gateway = start_service("api-gateway", 8000);
 
-    println!("✅ All services started!");
+    println!("All services started!");
     println!("   - API Gateway: http://127.0.0.1:8000");
     println!("   - Identity Proxy: http://127.0.0.1:8001");
     println!("   - Swagger UI: http://127.0.0.1:8000/swagger-ui/");
