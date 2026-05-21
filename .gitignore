@@ -4,6 +4,7 @@ debug
 .idea
 target/
 *.lock
+!Cargo.lock
 .idea
 
 Agent.md
