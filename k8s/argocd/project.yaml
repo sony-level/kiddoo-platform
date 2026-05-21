@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: kiddoo
+  namespace: argocd
+spec:
+  description: Kiddoo Platform - Baby sitting service
+
+  sourceRepos:
+    - https://github.com/sony-level/kiddoo-platform.git
+
+  destinations:
+    - namespace: kiddoo-dev
+      server: https://kubernetes.default.svc
+    - namespace: kiddoo-staging
+      server: https://kubernetes.default.svc
+    - namespace: kiddoo-production
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: apps
+      kind: Deployment
+    - group: external-secrets.io
+      kind: ExternalSecret
+    - group: networking.k8s.io
+      kind: Ingress
+
+  orphanedResources:
+    warn: true
