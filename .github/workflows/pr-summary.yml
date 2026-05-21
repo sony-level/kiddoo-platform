@@ -58,13 +58,13 @@ jobs:
               if [ -n "$file" ]; then
                 EXT="${file##*.}"
                 case "$EXT" in
-                  rs) ICON="🦀" ;;
-                  toml) ICON="📦" ;;
-                  yml|yaml) ICON="⚙️" ;;
-                  tf) ICON="🏗️" ;;
-                  md) ICON="📝" ;;
-                  Dockerfile|docker) ICON="🐳" ;;
-                  *) ICON="📄" ;;
+                  rs) ICON="[rs]" ;;
+                  toml) ICON="[toml]" ;;
+                  yml|yaml) ICON="[yml]" ;;
+                  tf) ICON="[tf]" ;;
+                  md) ICON="[md]" ;;
+                  Dockerfile|docker) ICON="[docker]" ;;
+                  *) ICON="-" ;;
                 esac
                 echo "- $ICON \`$file\`"
               fi
