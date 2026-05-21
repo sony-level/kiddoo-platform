@@ -2,7 +2,7 @@
 # GitHub Actions — PR Validation (before merge)
 #
 # Role: Fast feedback on PRs. Validates code quality before merge.
-# Jenkins handles: build, Docker, SonarQube, Trivy, deploy (after merge).
+# CD pipeline (cd.yml) handles: build, Docker, SonarQube, Trivy, deploy (after merge).
 # =============================================================================
 name: PR Validation
 
@@ -176,10 +176,10 @@ jobs:
              [ "${{ needs.test.result }}" = "success" ] && \
              [ "${{ needs.secret-scan.result }}" = "success" ]; then
             COLOR=3066993
-            STATUS="✅ PR Validation PASSED"
+            STATUS="PR Validation PASSED"
           else
             COLOR=15158332
-            STATUS="❌ PR Validation FAILED"
+            STATUS="PR Validation FAILED"
           fi
 
           PAYLOAD=$(cat <<EOF
