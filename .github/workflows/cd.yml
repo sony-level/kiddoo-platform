@@ -14,6 +14,8 @@
 #   SONAR_HOST_URL          — SonarQube server URL
 #   SONAR_TOKEN             — SonarQube auth token
 #   DISCORD_WEBHOOK_URL     — Discord notification webhook
+#   AWS_ACCESS_KEY_ID       — AWS credentials (to start/stop SonarQube VM)
+#   AWS_SECRET_ACCESS_KEY   — AWS credentials (to start/stop SonarQube VM)
 #
 # Automatic (via GITHUB_TOKEN):
 #   packages:write          — push Docker images to GHCR
@@ -203,6 +205,39 @@ jobs:
     if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/')
 
     steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - name: Start SonarQube VM
+        id: start-vm
+        run: |
+          INSTANCE_ID="i-02767f3be61547377"
+          STATE=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].State.Name' --output text)
+          echo "Current state: $STATE"
+
+          if [ "$STATE" != "running" ]; then
+            echo "Starting instance..."
+            aws ec2 start-instances --instance-ids $INSTANCE_ID
+            aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+            echo "Instance is running, waiting for SonarQube to be ready..."
+            sleep 30
+          fi
+
+          # Wait for SonarQube to respond (up to 3 minutes)
+          for i in $(seq 1 18); do
+            if curl -sf --max-time 5 "${{ secrets.SONAR_HOST_URL }}/api/system/status" | grep -q '"status":"UP"'; then
+              echo "SonarQube is ready"
+              exit 0
+            fi
+            echo "Waiting for SonarQube... ($i/18)"
+            sleep 10
+          done
+          echo "::warning::SonarQube may not be fully ready, proceeding anyway"
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -213,6 +248,14 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Stop SonarQube VM
+        if: always()
+        run: |
+          INSTANCE_ID="i-02767f3be61547377"
+          echo "Stopping instance to save costs..."
+          aws ec2 stop-instances --instance-ids $INSTANCE_ID
+          echo "Stop command sent (instance will shut down in background)"
 
   # ===================================================================
   # 3 — Docker Build & Push to GHCR
