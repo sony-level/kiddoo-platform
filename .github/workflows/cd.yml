@@ -16,6 +16,7 @@
 #   DISCORD_WEBHOOK_URL     — Discord notification webhook
 #   AWS_ACCESS_KEY_ID       — AWS credentials (to start/stop SonarQube VM)
 #   AWS_SECRET_ACCESS_KEY   — AWS credentials (to start/stop SonarQube VM)
+#   SONAR_EC2_INSTANCE_ID   — EC2 instance ID hosting SonarQube
 #
 # Automatic (via GITHUB_TOKEN):
 #   packages:write          — push Docker images to GHCR
@@ -215,7 +216,7 @@ jobs:
       - name: Start SonarQube VM
         id: start-vm
         run: |
-          INSTANCE_ID="i-02767f3be61547377"
+          INSTANCE_ID="${{ secrets.SONAR_EC2_INSTANCE_ID }}"
           STATE=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].State.Name' --output text)
           echo "Current state: $STATE"
 
@@ -252,7 +253,7 @@ jobs:
       - name: Stop SonarQube VM
         if: always()
         run: |
-          INSTANCE_ID="i-02767f3be61547377"
+          INSTANCE_ID="${{ secrets.SONAR_EC2_INSTANCE_ID }}"
           echo "Stopping instance to save costs..."
           aws ec2 stop-instances --instance-ids $INSTANCE_ID
           echo "Stop command sent (instance will shut down in background)"
