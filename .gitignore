@@ -35,3 +35,4 @@ Agent.md
 
 # Added by ggshield
 .cache_ggshield
+*.lock
