@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Commit-msg hook — Validate commit message format
+# Enforces Conventional Commits: type(scope): description
+# =============================================================================
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Skip merge commits
+if echo "$COMMIT_MSG" | grep -qE "^Merge "; then
+    exit 0
+fi
+
+# Conventional Commits pattern: type(optional-scope): description
+# Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+PATTERN="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9\-]+\))?: .{3,}"
+
+if ! echo "$COMMIT_MSG" | head -1 | grep -qE "$PATTERN"; then
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${RED}  ✗ INVALID COMMIT MESSAGE FORMAT${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  Your message: ${YELLOW}${COMMIT_MSG}${NC}"
+    echo ""
+    echo -e "  Expected format: ${GREEN}type(scope): description${NC}"
+    echo ""
+    echo -e "  Valid types:"
+    echo -e "    ${GREEN}feat${NC}     — New feature"
+    echo -e "    ${GREEN}fix${NC}      — Bug fix"
+    echo -e "    ${GREEN}docs${NC}     — Documentation only"
+    echo -e "    ${GREEN}style${NC}    — Code style (formatting, no logic change)"
+    echo -e "    ${GREEN}refactor${NC} — Code refactoring"
+    echo -e "    ${GREEN}perf${NC}     — Performance improvement"
+    echo -e "    ${GREEN}test${NC}     — Adding/updating tests"
+    echo -e "    ${GREEN}build${NC}    — Build system or dependencies"
+    echo -e "    ${GREEN}ci${NC}       — CI configuration"
+    echo -e "    ${GREEN}chore${NC}    — Maintenance tasks"
+    echo -e "    ${GREEN}revert${NC}   — Revert a commit"
+    echo ""
+    echo -e "  Examples:"
+    echo -e "    ${GREEN}feat(auth): add JWT token refresh${NC}"
+    echo -e "    ${GREEN}fix(api): handle null response from gateway${NC}"
+    echo -e "    ${GREEN}chore: update dependencies${NC}"
+    echo ""
+    echo -e "${YELLOW}    To bypass (emergency): git commit --no-verify${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    exit 1
+fi
+
+# Check message length (max 72 chars for first line)
+FIRST_LINE=$(echo "$COMMIT_MSG" | head -1)
+if [ ${#FIRST_LINE} -gt 72 ]; then
+    echo -e "${YELLOW}  ⚠ Commit message first line is too long (${#FIRST_LINE}/72 chars)${NC}"
+    echo -e "    Consider shortening it for better readability."
+    # Warning only, not blocking
+fi
+
+echo -e "${GREEN}  ✓ Commit message format OK${NC}"
+exit 0

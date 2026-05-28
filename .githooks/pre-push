@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Pre-push hook — Heavier checks before pushing to remote
+# Mirrors CI test + build jobs: cargo test + cargo build
+# =============================================================================
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}  PRE-PUSH HOOKS — Validating before push...${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+ERRORS=0
+
+# ---------------------------------------------------------------------------
+# 1. Run tests
+# ---------------------------------------------------------------------------
+echo -e "\n${YELLOW}[1/2]${NC} Running tests (cargo test)..."
+if ! cargo test --workspace 2>&1 | tail -30; then
+    echo -e "${RED}  ✗ Tests FAILED!${NC}"
+    ERRORS=$((ERRORS + 1))
+else
+    echo -e "${GREEN}  ✓ All tests passed${NC}"
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Build check (release mode, same as CI)
+# ---------------------------------------------------------------------------
+echo -e "\n${YELLOW}[2/2]${NC} Checking build (cargo build --release)..."
+if ! cargo build --workspace --release 2>&1 | tail -20; then
+    echo -e "${RED}  ✗ Build FAILED!${NC}"
+    ERRORS=$((ERRORS + 1))
+else
+    echo -e "${GREEN}  ✓ Build OK${NC}"
+fi
+
+# ---------------------------------------------------------------------------
+# Final result
+# ---------------------------------------------------------------------------
+echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+if [ "$ERRORS" -gt 0 ]; then
+    echo -e "${RED}  ✗ PRE-PUSH FAILED — $ERRORS check(s) failed${NC}"
+    echo -e "${RED}    Push aborted. Fix issues and try again.${NC}"
+    echo -e "${YELLOW}    To bypass (emergency): git push --no-verify${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    exit 1
+else
+    echo -e "${GREEN}  ✓ ALL PRE-PUSH CHECKS PASSED${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    exit 0
+fi
