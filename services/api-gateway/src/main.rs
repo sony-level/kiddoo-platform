@@ -46,6 +46,6 @@ fn rocket() -> _ {
         )
         .mount(
             "/",
-            SwaggerUi::new("/swagger-ui/<_..>").url("/api-docs/openapi.json", ApiDoc::openapi()),
+            SwaggerUi::new("/api/v1/swagger-ui/<_..>").url("/api/v1/api-docs/openapi.json", ApiDoc::openapi()),
         )
 }

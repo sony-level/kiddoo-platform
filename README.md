@@ -1,4 +1,4 @@
-# Kiddoo Platform
+# kiddoo-platform
 
 REST API for the Kiddoo babysitting mobile application.
 
