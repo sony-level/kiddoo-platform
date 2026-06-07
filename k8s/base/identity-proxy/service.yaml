@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-proxy
+  labels:
+    app: identity-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: identity-proxy
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
+      name: http

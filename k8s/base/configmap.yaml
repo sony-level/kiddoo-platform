@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kiddoo-config
+  labels:
+    app.kubernetes.io/part-of: kiddoo-platform
+data:
+  ROCKET_ADDRESS: "0.0.0.0"
+  ROCKET_LOG_LEVEL: "normal"
+  RUST_LOG: "info"
+  API_GATEWAY_PORT: "8000"
+  IDENTITY_PROXY_PORT: "8001"

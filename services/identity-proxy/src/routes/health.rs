@@ -13,7 +13,7 @@ use rocket::serde::json::Json;
  *
  * ## Route: GET /api/v1/health
  *
- * ## Security: 🔓 Public (no authentication required)
+ * ## Security: Public (no authentication required)
  *
  * ## Response (200 OK)
  * ```json
