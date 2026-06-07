@@ -5,6 +5,10 @@
 # =============================================================================
 set -euo pipefail
 
+# Ensure cargo is in PATH (IDEs launch hooks in a minimal shell)
+export PATH="$HOME/.cargo/bin:$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:/usr/local/bin:$PATH"
+[ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

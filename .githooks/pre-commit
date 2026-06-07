@@ -5,6 +5,10 @@
 # =============================================================================
 set -euo pipefail
 
+# Ensure cargo is in PATH (IDEs launch hooks in a minimal shell)
+export PATH="$HOME/.cargo/bin:$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:/usr/local/bin:$PATH"
+[ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -49,24 +53,27 @@ echo -e "\n${YELLOW}[3/4]${NC} Scanning for secrets in staged files..."
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -v '^\.githooks/' || true)
 
 if [ -n "$STAGED_FILES" ]; then
-    # Patterns that indicate potential secrets
+    # Patterns that indicate potential secrets (actual values, not variable names)
     SECRET_PATTERNS=(
         "PRIVATE.KEY"
         "password\s*=\s*[\"'][^\"']{8,}"
         "secret\s*=\s*[\"'][^\"']{8,}"
         "api_key\s*=\s*[\"'][^\"']{8,}"
         "token\s*=\s*[\"'][^\"']{8,}"
-        "AWS_SECRET_ACCESS_KEY"
+        "AWS_SECRET_ACCESS_KEY\s*=\s*[\"']?[A-Za-z0-9/+=]{20,}"
         "AKIA[0-9A-Z]{16}"
         "-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----"
         "ghp_[a-zA-Z0-9]{36}"
         "gho_[a-zA-Z0-9]{36}"
     )
 
+    # File patterns to exclude from secret scanning (docs, templates, examples)
+    EXCLUDE_FROM_SCAN='\.md$|\.example$|\.template$'
+
     SECRETS_FOUND=0
     for pattern in "${SECRET_PATTERNS[@]}"; do
-        # Search only staged content (not the whole file)
-        MATCHES=$(git diff --cached -G"$pattern" --name-only 2>/dev/null | grep -v '^\.githooks/' || true)
+        # Search only staged content, exclude docs and config templates
+        MATCHES=$(git diff --cached -G"$pattern" --name-only 2>/dev/null | grep -v '^\.githooks/' | grep -Ev "$EXCLUDE_FROM_SCAN" || true)
         if [ -n "$MATCHES" ]; then
             echo -e "${RED}  ⚠ Potential secret pattern found: ${pattern}${NC}"
             echo -e "    In files: $MATCHES"
