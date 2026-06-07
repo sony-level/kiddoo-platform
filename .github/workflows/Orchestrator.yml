@@ -47,7 +47,7 @@ jobs:
     uses: ./.github/workflows/build-validation.yml
     secrets: inherit
 
-  # Step 5: Deployment (only if all previous steps passed)
+  # Step 5: Deployment (only if all previous steps passed) 
   deploy:
     name: Deployment
     needs: [build]
