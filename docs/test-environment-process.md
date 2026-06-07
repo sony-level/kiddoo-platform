@@ -53,7 +53,7 @@ The `deploy-test.yml` workflow automatically checks out the code:
             |
     ArgoCD detects change
             |
-    Deploy to EKS (kiddoo-staging)
+    Deploy to EKS (kiddoo-test)
             |
     +-------+-------+
     |       |       |
@@ -64,9 +64,9 @@ The `deploy-test.yml` workflow automatically checks out the code:
 
 | K8s Resource   | Description                               |
 | -------------- | ----------------------------------------- |
-| Namespace      | `kiddoo-staging` (auto-created)           |
-| Deployment     | `staging-api-gateway` (2 replicas)        |
-| Deployment     | `staging-identity-proxy` (2 replicas)     |
+| Namespace      | `kiddoo-test` (auto-created)              |
+| Deployment     | `test-api-gateway` (1 replica)            |
+| Deployment     | `test-identity-proxy` (1 replica)         |
 | Service        | ClusterIP per service                     |
 | ConfigMap      | Application config (log level, CORS, env) |
 | ExternalSecret | Secrets from AWS Secrets Manager          |
@@ -75,10 +75,10 @@ The `deploy-test.yml` workflow automatically checks out the code:
 
 The test environment mirrors production infrastructure:
 
-- **Isolation**: dedicated Kubernetes namespace (`kiddoo-staging`)
+- **Isolation**: dedicated Kubernetes namespace (`kiddoo-test`)
 - **Configuration**: environment-specific variables
 - **Secrets**: managed via AWS Secrets Manager (no plaintext secrets in Git)
-- **Scalability**: 2 replicas (vs 3 in prod, 1 in dev)
+- **Scalability**: 1 replica, matching the on-demand test overlay
 - **Monitoring**: health checks (liveness + readiness probes)
 - **Rolling update**: zero-downtime deployments
 
@@ -220,27 +220,27 @@ Failure detected
 
 ```bash
 # Pod status
-kubectl get pods -n kiddoo-staging
+kubectl get pods -n kiddoo-test
 
 # Service logs
-kubectl logs -n kiddoo-staging deployment/staging-api-gateway
+kubectl logs -n kiddoo-test deployment/test-api-gateway
 
 # ArgoCD status
-argocd app get kiddoo-staging
+argocd app get kiddoo-test
 
 # Force ArgoCD sync
-argocd app sync kiddoo-staging
+argocd app sync kiddoo-test
 ```
 
 ### Rollback
 
 ```bash
 # Via ArgoCD (revert to previous version)
-argocd app rollback kiddoo-staging
+argocd app rollback kiddoo-test
 
 # Via Kubernetes
-kubectl rollout undo deployment/staging-api-gateway -n kiddoo-staging
-kubectl rollout undo deployment/staging-identity-proxy -n kiddoo-staging
+kubectl rollout undo deployment/test-api-gateway -n kiddoo-test
+kubectl rollout undo deployment/test-identity-proxy -n kiddoo-test
 ```
 
 ### Run tests locally
@@ -266,5 +266,8 @@ cargo build --release --workspace
 | `.github/workflows/cd.yml`                        | CD pipeline (build, Docker, deploy, post-deploy tests) |
 | `.github/workflows/deploy-test.yml`               | On-demand test environment deployment                  |
 | `.github/ISSUE_TEMPLATE/bug-test-environment.yml` | Issue template for bug reports                         |
-| `k8s/overlays/staging/`                           | K8s manifests for the test environment                 |
+| `k8s/overlays/test/`                              | K8s manifests for the test environment                 |
+| `k8s/overlays/staging/`                           | K8s manifests for staging (release validation)         |
+| `k8s/argocd/test.yaml`                            | ArgoCD Application for test environment                |
 | `k8s/argocd/staging.yaml`                         | ArgoCD Application for staging                         |
+| `docs/environments.md`                            | Full environment strategy reference                    |
