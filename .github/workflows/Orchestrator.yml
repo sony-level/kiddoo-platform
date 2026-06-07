@@ -26,7 +26,7 @@ jobs:
     uses: ./.github/workflows/format-check.yml
     secrets: inherit
 
-  # Step 2: Security analysis
+  # Step 2: Security analysis 
   security:
     name: Security Analysis
     needs: [format]
