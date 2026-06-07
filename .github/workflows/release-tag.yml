@@ -1,0 +1,107 @@
+# =============================================================================
+# Auto Release Tag — Tags version on master merge
+#
+# Triggered when a PR is merged into master.
+# Reads version from Cargo.toml and creates a Git tag + GitHub Release.
+#
+# Flow:
+#   release/* --merge--> master --> v1.2.3 tag + GitHub Release
+# =============================================================================
+
+name: Release Tag
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Create Release Tag
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "Detected version: ${VERSION}"
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag ${TAG} already exists, skipping"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag ${TAG} does not exist, will create"
+          fi
+
+      - name: Create Git tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Generate changelog
+        if: steps.check_tag.outputs.exists == 'false'
+        id: changelog
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges -20)
+          fi
+          
+          # Write to file to avoid escaping issues
+          {
+            echo "## What's Changed"
+            echo ""
+            echo "$COMMITS"
+            echo ""
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.version.outputs.tag }}"
+          } > release_notes.md
+          
+          echo "Generated changelog with $(echo "$COMMITS" | wc -l) commits"
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Release ${{ steps.version.outputs.tag }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-rc') || contains(steps.version.outputs.version, '-beta') }}
+          generate_release_notes: true
+
+      - name: Summary
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          echo "## Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Docker images and deployment handled by CD pipeline." >> $GITHUB_STEP_SUMMARY
