@@ -2,7 +2,7 @@ name: CI/CD Pipeline Orchestrator
 
 on:
   push:
-    branches: 
+    branches:
       - develop
       - feature
       - hotfix
@@ -25,6 +25,10 @@ jobs:
   security:
     name: Security Analysis
     needs: [format]
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     uses: ./.github/workflows/security-analysis.yml
     secrets: inherit
 
@@ -55,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [format, security, tests, build, deploy]
     if: always()
-    
+
     steps:
       - name: Check all workflows status
         run: |
@@ -68,7 +72,7 @@ jobs:
           echo "Build Validation: ${{ needs.build.result }}"
           echo "Deployment: ${{ needs.deploy.result }}"
           echo ""
-          
+
           if [ "${{ needs.format.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ] || \
              [ "${{ needs.tests.result }}" != "success" ] || \
@@ -76,5 +80,5 @@ jobs:
             echo "Pipeline FAILED - One or more steps did not succeed"
             exit 1
           fi
-          
+
           echo "Pipeline PASSED - All steps completed successfully"
