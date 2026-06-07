@@ -12,6 +12,8 @@ spec:
   destinations:
     - namespace: kiddoo-dev
       server: https://kubernetes.default.svc
+    - namespace: kiddoo-test
+      server: https://kubernetes.default.svc
     - namespace: kiddoo-staging
       server: https://kubernetes.default.svc
     - namespace: kiddoo-production
