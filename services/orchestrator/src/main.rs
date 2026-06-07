@@ -23,7 +23,6 @@ fn main() {
     // Start api-gateway
     let mut api_gateway = start_service("api-gateway", 8000);
 
-    println!("All services started!");
     // Wait a bit for api-gateway to start, then verify it's running
     std::thread::sleep(std::time::Duration::from_secs(3));
     verify_service_running(&mut api_gateway, "api-gateway");
@@ -61,15 +60,15 @@ fn verify_service_running(child: &mut Child, name: &str) {
     match child.try_wait() {
         Ok(Some(status)) => {
             panic!(
-                " Service '{}' exited unexpectedly with status: {}",
+                "Service '{}' exited unexpectedly with status: {}",
                 name, status
             );
         }
         Ok(None) => {
-            println!(" Service '{}' is running", name);
+            println!("Service '{}' is running", name);
         }
         Err(e) => {
-            panic!(" Failed to check status of service '{}': {}", name, e);
+            panic!("Failed to check status of service '{}': {}", name, e);
         }
     }
 }
