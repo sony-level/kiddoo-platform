@@ -1,5 +1,5 @@
 name: "Bug Report - Test Environment"
-description: "Report a bug found during testing in the staging/test environment"
+description: "Report a bug found during testing in the test environment"
 title: "[TEST-BUG] "
 labels: ["bug", "test-environment", "needs-fix"]
 assignees: []
@@ -9,7 +9,7 @@ body:
       value: |
         ## Test Environment Bug Report
         Use this form to report a bug found during testing on the
-        staging/test environment to the development team.
+        test environment to the development team.
 
   - type: input
     id: version
@@ -90,7 +90,7 @@ body:
       label: "Steps to reproduce"
       description: "Precise steps to reproduce the bug"
       placeholder: |
-        1. Deploy version 0.1.0-test-42 to staging
+        1. Deploy version 0.1.0-test-42 to test
         2. Wait for ArgoCD sync
         3. Call GET /api/v1/health
         4. Observe status code 503
@@ -104,7 +104,7 @@ body:
       description: "Paste relevant logs (kubectl logs, test output, etc.)"
       render: shell
       placeholder: |
-        $ kubectl logs -n kiddoo-staging deployment/staging-api-gateway
+        $ kubectl logs -n kiddoo-test deployment/test-api-gateway
         ERROR: database connection refused at 10.0.1.5:5432
 
   - type: input
@@ -121,8 +121,8 @@ body:
       description: "Technical context of the test environment"
       value: |
         - **Cluster**: EKS (eu-north-1)
-        - **Namespace**: kiddoo-staging
-        - **ArgoCD App**: kiddoo-staging
+        - **Namespace**: kiddoo-test
+        - **ArgoCD App**: kiddoo-test
         - **Registry**: GHCR (ghcr.io/sony-level)
 
   - type: textarea

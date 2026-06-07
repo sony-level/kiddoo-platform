@@ -5,10 +5,7 @@
 # Images are pushed to GitHub Container Registry (GHCR).
 # ArgoCD syncs Kubernetes manifests from this repo.
 #
-# Branch -> Environment:
-#   develop    -> dev         (auto deploy, ArgoCD auto-sync)
-#   release/*  -> staging     (manual approval, ArgoCD auto-sync)
-#   master     -> production  (manual approval, ArgoCD auto-sync)
+# Environment mapping and per-environment config live in docs/environments.md.
 #
 # Required GitHub Secrets:
 #   SONAR_HOST_URL          — SonarQube server URL
@@ -21,10 +18,7 @@
 # Automatic (via GITHUB_TOKEN):
 #   packages:write          — push Docker images to GHCR
 #
-# Required GitHub Environments (Settings > Environments):
-#   development  — no protection rules (auto deploy)
-#   staging      — required reviewers for approval gate
-#   production   — required reviewers for approval gate
+# Required GitHub Environments are documented in docs/environments.md.
 # =============================================================================
 
 name: CD Pipeline
@@ -172,32 +166,147 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Trivy filesystem scan
+      # --- Filesystem vulnerability scan (dependencies) ---
+      - name: Trivy filesystem scan (table)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
-          severity: HIGH,CRITICAL
+          scan-ref: .
+          severity: LOW,MEDIUM,HIGH,CRITICAL
           exit-code: "0"
           format: table
           output: trivy-fs-report.txt
 
-      - name: Trivy config scan
+      - name: Trivy filesystem scan (JSON)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: "0"
+          format: json
+          output: trivy-fs-report.json
+
+      # --- Config / IaC scan (Dockerfile, K8s manifests, etc.) ---
+      - name: Trivy config scan (table)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: config
-          severity: HIGH,CRITICAL
+          scan-ref: .
+          severity: LOW,MEDIUM,HIGH,CRITICAL
           exit-code: "0"
           format: table
           output: trivy-config-report.txt
+
+      - name: Trivy config scan (JSON)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: "0"
+          format: json
+          output: trivy-config-report.json
+
+      # --- Secret scan ---
+      - name: Trivy secret scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          exit-code: "0"
+          format: table
+          output: trivy-secret-report.txt
+
+      # --- Generate summary report ---
+      - name: Generate Trivy summary
+        if: always()
+        run: |
+          {
+            echo "## Trivy Security Report — Source Code"
+            echo ""
+            echo "### Filesystem Vulnerabilities (Dependencies)"
+            echo ""
+            if [ -f trivy-fs-report.json ]; then
+              TOTAL=$(jq '[.Results[]?.Vulnerabilities // [] | length] | add // 0' trivy-fs-report.json)
+              CRITICAL=$(jq '[.Results[]?.Vulnerabilities // [] | .[] | select(.Severity=="CRITICAL")] | length' trivy-fs-report.json)
+              HIGH=$(jq '[.Results[]?.Vulnerabilities // [] | .[] | select(.Severity=="HIGH")] | length' trivy-fs-report.json)
+              MEDIUM=$(jq '[.Results[]?.Vulnerabilities // [] | .[] | select(.Severity=="MEDIUM")] | length' trivy-fs-report.json)
+              LOW=$(jq '[.Results[]?.Vulnerabilities // [] | .[] | select(.Severity=="LOW")] | length' trivy-fs-report.json)
+              echo "| Severity | Count |"
+              echo "|----------|-------|"
+              echo "| 🔴 Critical | ${CRITICAL} |"
+              echo "| 🟠 High | ${HIGH} |"
+              echo "| 🟡 Medium | ${MEDIUM} |"
+              echo "| 🔵 Low | ${LOW} |"
+              echo "| **Total** | **${TOTAL}** |"
+            else
+              echo "⚠️ No filesystem scan results available"
+            fi
+            echo ""
+            echo "### IaC / Config Misconfigurations"
+            echo ""
+            if [ -f trivy-config-report.json ]; then
+              MISCONF=$(jq '[.Results[]?.Misconfigurations // [] | length] | add // 0' trivy-config-report.json)
+              MC_CRITICAL=$(jq '[.Results[]?.Misconfigurations // [] | .[] | select(.Severity=="CRITICAL")] | length' trivy-config-report.json)
+              MC_HIGH=$(jq '[.Results[]?.Misconfigurations // [] | .[] | select(.Severity=="HIGH")] | length' trivy-config-report.json)
+              MC_MEDIUM=$(jq '[.Results[]?.Misconfigurations // [] | .[] | select(.Severity=="MEDIUM")] | length' trivy-config-report.json)
+              MC_LOW=$(jq '[.Results[]?.Misconfigurations // [] | .[] | select(.Severity=="LOW")] | length' trivy-config-report.json)
+              echo "| Severity | Count |"
+              echo "|----------|-------|"
+              echo "| 🔴 Critical | ${MC_CRITICAL} |"
+              echo "| 🟠 High | ${MC_HIGH} |"
+              echo "| 🟡 Medium | ${MC_MEDIUM} |"
+              echo "| 🔵 Low | ${MC_LOW} |"
+              echo "| **Total** | **${MISCONF}** |"
+            else
+              echo "⚠️ No config scan results available"
+            fi
+            echo ""
+            echo "### Secret Detection"
+            echo ""
+            if [ -f trivy-secret-report.txt ] && [ -s trivy-secret-report.txt ]; then
+              echo "⚠️ Secrets detected — review \`trivy-secret-report.txt\` artifact"
+            else
+              echo "✅ No secrets detected in source code"
+            fi
+            echo ""
+            echo "---"
+            echo ""
+            echo "<details><summary>📄 Full filesystem scan output</summary>"
+            echo ""
+            echo '```'
+            cat trivy-fs-report.txt 2>/dev/null || echo "No output"
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>📄 Full config scan output</summary>"
+            echo ""
+            echo '```'
+            cat trivy-config-report.txt 2>/dev/null || echo "No output"
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>📄 Secret scan output</summary>"
+            echo ""
+            echo '```'
+            cat trivy-secret-report.txt 2>/dev/null || echo "No output"
+            echo '```'
+            echo "</details>"
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Trivy reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-reports
+          name: trivy-source-reports
           path: |
             trivy-fs-report.txt
+            trivy-fs-report.json
             trivy-config-report.txt
+            trivy-config-report.json
+            trivy-secret-report.txt
 
   sonarqube:
     name: SonarQube Analysis
@@ -324,30 +433,111 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Scan api-gateway image
+      # --- api-gateway image scan ---
+      - name: Scan api-gateway image (table)
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.GHCR_REGISTRY }}/kiddoo-api-gateway:${{ needs.docker-build.outputs.version }}
-          severity: HIGH,CRITICAL
+          severity: LOW,MEDIUM,HIGH,CRITICAL
           exit-code: "0"
           format: table
           output: trivy-image-api-gateway.txt
 
-      - name: Scan identity-proxy image
+      - name: Scan api-gateway image (JSON)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.GHCR_REGISTRY }}/kiddoo-api-gateway:${{ needs.docker-build.outputs.version }}
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: "0"
+          format: json
+          output: trivy-image-api-gateway.json
+
+      # --- identity-proxy image scan ---
+      - name: Scan identity-proxy image (table)
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.GHCR_REGISTRY }}/kiddoo-identity-proxy:${{ needs.docker-build.outputs.version }}
-          severity: HIGH,CRITICAL
+          severity: LOW,MEDIUM,HIGH,CRITICAL
           exit-code: "0"
           format: table
           output: trivy-image-identity-proxy.txt
+
+      - name: Scan identity-proxy image (JSON)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.GHCR_REGISTRY }}/kiddoo-identity-proxy:${{ needs.docker-build.outputs.version }}
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: "0"
+          format: json
+          output: trivy-image-identity-proxy.json
+
+      # --- Generate image scan summary ---
+      - name: Generate image scan summary
+        if: always()
+        env:
+          VERSION: ${{ needs.docker-build.outputs.version }}
+        run: |
+          count_vulns() {
+            local file=$1 sev=$2
+            jq "[.Results[]?.Vulnerabilities // [] | .[] | select(.Severity==\"${sev}\")] | length" "$file" 2>/dev/null || echo 0
+          }
+
+          image_report() {
+            local name=$1 json_file=$2 txt_file=$3
+            echo "### ${name}"
+            echo ""
+            if [ -f "$json_file" ]; then
+              TOTAL=$(jq '[.Results[]?.Vulnerabilities // [] | length] | add // 0' "$json_file")
+              CRITICAL=$(count_vulns "$json_file" "CRITICAL")
+              HIGH=$(count_vulns "$json_file" "HIGH")
+              MEDIUM=$(count_vulns "$json_file" "MEDIUM")
+              LOW=$(count_vulns "$json_file" "LOW")
+              OS_PKGS=$(jq '[.Results[] | select(.Class=="os-pkgs") | .Vulnerabilities // [] | length] | add // 0' "$json_file")
+              LANG_PKGS=$(jq '[.Results[] | select(.Class=="lang-pkgs") | .Vulnerabilities // [] | length] | add // 0' "$json_file")
+              echo "| Severity | Count |"
+              echo "|----------|-------|"
+              echo "| 🔴 Critical | ${CRITICAL} |"
+              echo "| 🟠 High | ${HIGH} |"
+              echo "| 🟡 Medium | ${MEDIUM} |"
+              echo "| 🔵 Low | ${LOW} |"
+              echo "| **Total** | **${TOTAL}** |"
+              echo ""
+              echo "- **OS packages**: ${OS_PKGS} vulnerabilities"
+              echo "- **Language packages**: ${LANG_PKGS} vulnerabilities"
+            else
+              echo "⚠️ No scan results available"
+            fi
+            echo ""
+            if [ -f "$txt_file" ]; then
+              echo "<details><summary>📄 Full scan output</summary>"
+              echo ""
+              echo '```'
+              cat "$txt_file"
+              echo '```'
+              echo "</details>"
+              echo ""
+            fi
+          }
+
+          {
+            echo "## Trivy Security Report — Docker Images"
+            echo ""
+            echo "**Version**: \`${VERSION}\`"
+            echo ""
+            image_report "api-gateway" "trivy-image-api-gateway.json" "trivy-image-api-gateway.txt"
+            image_report "identity-proxy" "trivy-image-identity-proxy.json" "trivy-image-identity-proxy.txt"
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Upload image scan reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trivy-image-reports
-          path: trivy-image-*.txt
+          path: |
+            trivy-image-api-gateway.txt
+            trivy-image-api-gateway.json
+            trivy-image-identity-proxy.txt
+            trivy-image-identity-proxy.json
 
   # ===================================================================
   # 5 — Deploy Development (auto on develop)

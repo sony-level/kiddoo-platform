@@ -2,7 +2,11 @@
 # GitHub Actions — PR Validation (before merge)
 #
 # Role: Fast feedback on PRs. Validates code quality before merge.
-# CD pipeline (cd.yml) handles: build, Docker, SonarQube, Trivy, deploy (after merge).
+# CD pipeline (cd.yml) handles: build, Docker, SonarQube, Trivy, deploy.
+# deploy-test.yml handles: on-demand test environment.
+#
+# Mirrors local pre-commit hooks: fmt, clippy, tests, secret scan.
+# See docs/environments.md for full environment strategy.
 # =============================================================================
 name: PR Validation
 
@@ -66,18 +70,22 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:16-bookworm
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
+          POSTGRES_DB: kiddoo_test
+          POSTGRES_USER: kiddoo
+          POSTGRES_PASSWORD: kiddoo_test_pwd
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://kiddoo:kiddoo_test_pwd@localhost:5433/kiddoo_test
+      ENVIRONMENT: test
 
     steps:
       - name: Checkout code
@@ -102,13 +110,9 @@ jobs:
 
       - name: Run migrations
         run: cd libs/database && diesel migration run
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
 
       - name: Run tests
         run: cargo test --workspace --verbose
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
 
   # -------------------------------------------------------------------
   # Secret scan (prevent accidental credential leaks)
@@ -122,6 +126,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Validate env files have no real secrets
+        run: |
+          echo "Checking .env.* files for real secrets..."
+          FOUND=0
+          for f in .env.development .env.test .env.staging .env.production; do
+            if [ -f "$f" ]; then
+              # Check for values that don't look like placeholders
+              if grep -P '(SECRET|PASSWORD|TOKEN)=(?!<from-)(?!\$\{).{8,}' "$f" | grep -v '#' | grep -v 'placeholder' | grep -v 'example'; then
+                echo "::warning::Potential real secret in $f"
+                FOUND=1
+              fi
+            fi
+          done
+          if [ "$FOUND" -eq 1 ]; then
+            echo "::error::Real secrets detected in tracked .env files!"
+            exit 1
+          fi
+          echo "✓ No real secrets in .env files"
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2

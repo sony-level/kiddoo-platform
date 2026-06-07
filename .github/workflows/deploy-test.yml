@@ -5,15 +5,17 @@
 #   1. Retrieve application code (checkout target branch)
 #   2. Build a test version (compile + unit tests)
 #   3. Push Docker images to GitHub Container Registry (GHCR)
-#   4. Run tests (smoke, integration, E2E)
-#   5. Report failures to developers via GitHub Issues
+#   4. Deploy to kiddoo-test namespace (ArgoCD auto-sync)
+#   5. Run tests (smoke, integration, E2E)
+#   6. Report failures to developers via GitHub Issues
+#
+# Environment: test → kiddoo-test (K8s namespace)
+# Overlay: k8s/overlays/test
 #
 # Trigger:
 #   - Manual: workflow_dispatch (pick branch + test level)
 #
-# Prerequisites:
-#   - GITHUB_TOKEN with packages:write (automatic)
-#   - GitHub Environments: staging (required reviewers)
+# Prerequisites and environment strategy live in docs/environments.md.
 # =============================================================================
 name: Deploy Test Environment
 
@@ -131,6 +133,7 @@ jobs:
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         env:
           DATABASE_URL: postgres://kiddoo:kiddoo_test_pwd@localhost:5433/kiddoo_test
+          ENVIRONMENT: test
 
       - name: Build release binaries
         run: cargo build --release --workspace
@@ -178,7 +181,7 @@ jobs:
     name: "2. Create test environment"
     runs-on: ubuntu-latest
     needs: build-test-version
-    environment: staging
+    environment: test
 
     outputs:
       version: ${{ needs.build-test-version.outputs.version }}
@@ -227,7 +230,7 @@ jobs:
         env:
           VERSION: ${{ needs.build-test-version.outputs.version }}
         run: |
-          cd k8s/overlays/staging
+          cd k8s/overlays/test
           sed -i "s|newTag:.*|newTag: \"${VERSION}\"|g" kustomization.yaml
           sed -i "s|newName:.*kiddoo-api-gateway|newName: ${{ env.GHCR_REGISTRY }}/kiddoo-api-gateway|g" kustomization.yaml
           sed -i "s|newName:.*kiddoo-identity-proxy|newName: ${{ env.GHCR_REGISTRY }}/kiddoo-identity-proxy|g" kustomization.yaml
@@ -236,9 +239,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/overlays/staging/kustomization.yaml
+          git add k8s/overlays/test/kustomization.yaml
           git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "test-env: deploy version ${{ needs.build-test-version.outputs.version }} to staging"
+          git commit -m "test-env: deploy version ${{ needs.build-test-version.outputs.version }} to test"
           git push
 
       - name: Environment creation summary
@@ -252,7 +255,7 @@ jobs:
             echo "| K8s manifests | Updated |"
             echo "| ArgoCD sync | Pending (auto-sync) |"
             echo ""
-            echo "**Target namespace** : \`kiddoo-staging\`"
+            echo "**Target namespace** : \`kiddoo-test\`"
             echo ""
             echo "**Deployed images** :"
             echo "- \`${{ env.GHCR_REGISTRY }}/kiddoo-api-gateway:${{ needs.build-test-version.outputs.version }}\`"
