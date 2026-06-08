@@ -880,30 +880,53 @@ jobs:
   notify-success:
     name: Notify Success
     runs-on: ubuntu-latest
-    needs:
-      [
-        build-and-test,
-        docker-build,
-        deploy-dev,
-        deploy-staging,
-        deploy-production,
-        tag-stable-release,
-      ]
-    if: always() && !failure() && !cancelled()
+    needs: [build-and-test, docker-build]
+    if: success()
 
     steps:
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "env_name=production" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
+            echo "env_name=staging" >> $GITHUB_OUTPUT
+          else
+            echo "env_name=development" >> $GITHUB_OUTPUT
+          fi
+
       - name: Discord success notification
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
           VERSION: ${{ needs.build-and-test.outputs.version }}
         run: |
-          [ -z "$DISCORD_WEBHOOK" ] && echo "No Discord webhook configured" && exit 0
+          [ -z "$DISCORD_WEBHOOK" ] && echo "No Discord webhook configured, printing summary instead"
+
+          ENV_NAME="${{ steps.env.outputs.env_name }}"
+          TITLE="CD Pipeline SUCCESS — ${ENV_NAME}"
+          DESC="**${{ github.repository }}** #${{ github.run_number }}\nEnvironment: \`${ENV_NAME}\`\nBranch: \`${{ github.ref_name }}\`\nVersion: \`${VERSION}\`\nCommit: \`${{ github.sha }}\`"
+
+          # Always write to GitHub Step Summary
+          {
+            echo "## ${TITLE}"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Environment | \`${ENV_NAME}\` |"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Version | \`${VERSION}\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Status | Deployed |"
+          } >> $GITHUB_STEP_SUMMARY
+
+          # Send Discord notification if webhook is configured
+          [ -z "$DISCORD_WEBHOOK" ] && exit 0
 
           PAYLOAD=$(cat <<EOF
           {
             "embeds": [{
-              "title": "CD Pipeline SUCCESS",
-              "description": "**${{ github.repository }}** #${{ github.run_number }}\nBranch: \`${{ github.ref_name }}\`\nVersion: \`${VERSION}\`\nCommit: \`${{ github.sha }}\`",
+              "title": "${TITLE}",
+              "description": "${DESC}",
               "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
               "color": 3066993,
               "footer": { "text": "GitHub Actions — CD Pipeline" },
@@ -917,16 +940,8 @@ jobs:
   notify-failure:
     name: Notify Failure
     runs-on: ubuntu-latest
-    needs:
-      [
-        build-and-test,
-        docker-build,
-        deploy-dev,
-        deploy-staging,
-        deploy-production,
-        tag-stable-release,
-      ]
-    if: always() && failure()
+    needs: [build-and-test, docker-build]
+    if: failure()
 
     steps:
       - name: Discord failure notification
@@ -934,13 +949,31 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
           VERSION: ${{ needs.build-and-test.outputs.version }}
         run: |
-          [ -z "$DISCORD_WEBHOOK" ] && echo "No Discord webhook configured" && exit 0
+          [ -z "$DISCORD_WEBHOOK" ] && echo "No Discord webhook configured, printing summary instead"
+
+          TITLE="CD Pipeline FAILED"
+          DESC="**${{ github.repository }}** #${{ github.run_number }}\nBranch: \`${{ github.ref_name }}\`\nVersion: \`${VERSION}\`\nCommit: \`${{ github.sha }}\`"
+
+          # Always write to GitHub Step Summary
+          {
+            echo "## ${TITLE}"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Version | \`${VERSION}\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Status | **FAILED** |"
+          } >> $GITHUB_STEP_SUMMARY
+
+          # Send Discord notification if webhook is configured
+          [ -z "$DISCORD_WEBHOOK" ] && exit 0
 
           PAYLOAD=$(cat <<EOF
           {
             "embeds": [{
-              "title": "CD Pipeline FAILED",
-              "description": "**${{ github.repository }}** #${{ github.run_number }}\nBranch: \`${{ github.ref_name }}\`\nVersion: \`${VERSION}\`\nCommit: \`${{ github.sha }}\`",
+              "title": "${TITLE}",
+              "description": "${DESC}",
               "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
               "color": 15158332,
               "footer": { "text": "GitHub Actions — CD Pipeline" },
