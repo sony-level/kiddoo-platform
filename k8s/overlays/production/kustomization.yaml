@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kiddoo-production
+
+resources:
+  - ../../base
+
+namePrefix: prod-
+
+patches:
+  - path: configmap-patch.yaml
+  - path: secret-patch.yaml
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target:
+      kind: Deployment
+      name: identity-proxy
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+images:
+  - name: ghcr.io/sony-level/kiddoo-api-gateway
+    newName: ghcr.io/sony-level/kiddoo-api-gateway
+    newTag: prod
+  - name: ghcr.io/sony-level/kiddoo-identity-proxy
+    newName: ghcr.io/sony-level/kiddoo-identity-proxy
+    newTag: prod
+
+commonLabels:
+  environment: production

@@ -1,0 +1,64 @@
+name: Code Formatting Check
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  format-check:
+    name: Code Formatting Check
+    runs-on: ubuntu-latest
+    outputs:
+      format-passed: ${{ steps.check.outputs.formatted }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.USED_PERMISSION || github.token }}
+          ref: ${{ github.head_ref || github.ref }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        id: check
+        run: |
+          if cargo fmt --all -- --check; then
+            echo "formatted=true" >> $GITHUB_OUTPUT
+            echo "Code formatting is correct"
+          else
+            echo "formatted=false" >> $GITHUB_OUTPUT
+            echo "Formatting issues detected"
+          fi
+
+      - name: Auto-format code
+        if: steps.check.outputs.formatted == 'false'
+        run: |
+          echo "Auto-formatting code..."
+          cargo fmt --all
+          echo "Code formatted successfully"
+
+      - name: Create Pull Request with fixes
+        if: steps.check.outputs.formatted == 'false'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.USED_PERMISSION || github.token }}
+          commit-message: "auto: format code according to rustfmt standards"
+          committer: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: auto-format/${{ github.ref_name }}
+          delete-branch: true
+          title: "[Auto] Fix code formatting for ${{ github.ref_name }}"
+          body: |
+            This PR was automatically created to fix code formatting issues.
+
+            **Changes:**
+            - Applied `cargo fmt --all` to fix formatting
+
+            **Original branch:** `${{ github.ref_name }}`
+
+            Please review and merge to apply the formatting fixes.
+          labels: auto-format, ci-cd

@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Pre-commit hook — Fast checks before each commit
+# Mirrors CI lint job: cargo fmt + cargo clippy + secret detection
+# =============================================================================
+set -euo pipefail
+
+# Ensure cargo is in PATH (IDEs launch hooks in a minimal shell)
+export PATH="$HOME/.cargo/bin:$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:/usr/local/bin:$PATH"
+[ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}  PRE-COMMIT HOOKS — Validating before commit...${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+ERRORS=0
+
+# ---------------------------------------------------------------------------
+# 1. Check formatting (cargo fmt)
+# ---------------------------------------------------------------------------
+echo -e "\n${YELLOW}[1/4]${NC} Checking code formatting (cargo fmt)..."
+if ! cargo fmt --all -- --check 2>/dev/null; then
+    echo -e "${RED}  ✗ Formatting errors detected!${NC}"
+    echo -e "    Run: ${GREEN}cargo fmt --all${NC} to fix."
+    ERRORS=$((ERRORS + 1))
+else
+    echo -e "${GREEN}  ✓ Formatting OK${NC}"
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Run Clippy (linter)
+# ---------------------------------------------------------------------------
+echo -e "\n${YELLOW}[2/4]${NC} Running Clippy linter..."
+if ! cargo clippy --workspace -- -D warnings 2>&1 | tail -20; then
+    echo -e "${RED}  ✗ Clippy found warnings/errors!${NC}"
+    echo -e "    Fix the issues above before committing."
+    ERRORS=$((ERRORS + 1))
+else
+    echo -e "${GREEN}  ✓ Clippy OK${NC}"
+fi
+
+# ---------------------------------------------------------------------------
+# 3. Check for common secret patterns in staged files
+# ---------------------------------------------------------------------------
+echo -e "\n${YELLOW}[3/4]${NC} Scanning for secrets in staged files..."
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -v '^\.githooks/' || true)
+
+if [ -n "$STAGED_FILES" ]; then
+    # Patterns that indicate potential secrets (actual values, not variable names)
+    SECRET_PATTERNS=(
+        "PRIVATE.KEY"
+        "password\s*=\s*[\"'][^\"']{8,}"
+        "secret\s*=\s*[\"'][^\"']{8,}"
+        "api_key\s*=\s*[\"'][^\"']{8,}"
+        "token\s*=\s*[\"'][^\"']{8,}"
+        "AWS_SECRET_ACCESS_KEY\s*=\s*[\"']?[A-Za-z0-9/+=]{20,}"
+        "AKIA[0-9A-Z]{16}"
+        "-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----"
+        "ghp_[a-zA-Z0-9]{36}"
+        "gho_[a-zA-Z0-9]{36}"
+    )
+
+    # File patterns to exclude from secret scanning (docs, templates, examples)
+    EXCLUDE_FROM_SCAN='\.md$|\.example$|\.template$'
+
+    SECRETS_FOUND=0
+    for pattern in "${SECRET_PATTERNS[@]}"; do
+        # Search only staged content, exclude docs and config templates
+        MATCHES=$(git diff --cached -G"$pattern" --name-only 2>/dev/null | grep -v '^\.githooks/' | grep -Ev "$EXCLUDE_FROM_SCAN" || true)
+        if [ -n "$MATCHES" ]; then
+            echo -e "${RED}  ⚠ Potential secret pattern found: ${pattern}${NC}"
+            echo -e "    In files: $MATCHES"
+            SECRETS_FOUND=1
+        fi
+    done
+
+    # Use gitleaks if available (same as CI)
+    if command -v gitleaks &>/dev/null; then
+        if ! gitleaks protect --staged --no-banner 2>/dev/null; then
+            echo -e "${RED}  ✗ Gitleaks detected secrets!${NC}"
+            SECRETS_FOUND=1
+        fi
+    fi
+
+    if [ "$SECRETS_FOUND" -eq 1 ]; then
+        echo -e "${RED}  ✗ Secret scan FAILED${NC}"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo -e "${GREEN}  ✓ No secrets detected${NC}"
+    fi
+else
+    echo -e "${GREEN}  ✓ No staged files to scan${NC}"
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Check for common issues in staged files
+# ---------------------------------------------------------------------------
+echo -e "\n${YELLOW}[4/4]${NC} Checking for common issues..."
+
+ISSUES_FOUND=0
+
+# Check for TODO/FIXME markers that might be debug leftovers
+if [ -n "$STAGED_FILES" ]; then
+    # Check for .env files being committed
+    ENV_FILES=$(echo "$STAGED_FILES" | grep -E "^\.env($|\.)" | grep -v "\.example" || true)
+    if [ -n "$ENV_FILES" ]; then
+        echo -e "${RED}  ⚠ .env file(s) staged for commit: ${ENV_FILES}${NC}"
+        ISSUES_FOUND=1
+    fi
+
+    # Check for large files (> 5MB)
+    for file in $STAGED_FILES; do
+        if [ -f "$file" ]; then
+            SIZE=$(wc -c < "$file" 2>/dev/null || echo "0")
+            if [ "$SIZE" -gt 5242880 ]; then
+                echo -e "${RED}  ⚠ Large file (>5MB): ${file} (${SIZE} bytes)${NC}"
+                ISSUES_FOUND=1
+            fi
+        fi
+    done
+
+    # Check for debug prints (dbg! macro in Rust)
+    DBG_FILES=$(echo "$STAGED_FILES" | grep -v '^\.githooks/' | xargs grep -l 'dbg!' 2>/dev/null || true)
+    if [ -n "$DBG_FILES" ]; then
+        echo -e "${YELLOW}  ⚠ dbg! macro found in: ${DBG_FILES}${NC}"
+        echo -e "    Consider removing debug statements before committing."
+        # Warning only, not blocking
+    fi
+fi
+
+if [ "$ISSUES_FOUND" -eq 1 ]; then
+    ERRORS=$((ERRORS + 1))
+else
+    echo -e "${GREEN}  ✓ No common issues found${NC}"
+fi
+
+# ---------------------------------------------------------------------------
+# Final result
+# ---------------------------------------------------------------------------
+echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+if [ "$ERRORS" -gt 0 ]; then
+    echo -e "${RED}  ✗ PRE-COMMIT FAILED — $ERRORS check(s) failed${NC}"
+    echo -e "${RED}    Commit aborted. Fix issues and try again.${NC}"
+    echo -e "${YELLOW}    To bypass (emergency): git commit --no-verify${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    exit 1
+else
+    echo -e "${GREEN}  ✓ ALL PRE-COMMIT CHECKS PASSED${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    exit 0
+fi

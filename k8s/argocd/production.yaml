@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kiddoo-production
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: kiddoo-platform
+    environment: production
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: kiddoo
+  source:
+    repoURL: https://github.com/sony-level/kiddoo-platform.git
+    targetRevision: master
+    path: k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kiddoo-production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
