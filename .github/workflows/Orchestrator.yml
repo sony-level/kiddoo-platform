@@ -116,3 +116,45 @@ jobs:
           fi
 
           echo "**Pipeline PASSED** - ready to merge" >> $GITHUB_STEP_SUMMARY
+
+      - name: Discord notification
+        if: always()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          FORMAT="${{ needs.format.result }}"
+          SECURITY="${{ needs.security.result }}"
+          TESTS="${{ needs.tests.result }}"
+          BUILD="${{ needs.build.result }}"
+
+          if [ "$FORMAT" = "success" ] && [ "$SECURITY" = "success" ] && \
+             [ "$TESTS" = "success" ] && [ "$BUILD" = "success" ]; then
+            TITLE="CI Pipeline PASSED"
+            COLOR=3066993
+            STATUS="ready to merge"
+          else
+            TITLE="CI Pipeline FAILED"
+            COLOR=15158332
+            STATUS="merge blocked"
+          fi
+
+          [ -z "$DISCORD_WEBHOOK" ] && echo "No Discord webhook — ${TITLE}" && exit 0
+
+          PAYLOAD=$(cat <<'INNEREOF'
+          {
+            "embeds": [{
+              "title": "TITLE_PLACEHOLDER",
+              "description": "DESC_PLACEHOLDER",
+              "url": "URL_PLACEHOLDER",
+              "color": COLOR_PLACEHOLDER,
+              "footer": { "text": "GitHub Actions — CI Pipeline" }
+            }]
+          }
+          INNEREOF
+          )
+
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|TITLE_PLACEHOLDER|${TITLE}|")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|COLOR_PLACEHOLDER|${COLOR}|")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|DESC_PLACEHOLDER|${{ github.repository }} #${{ github.run_number }} / Branch: ${{ github.ref_name }} / ${STATUS} / Format: ${FORMAT} / Security: ${SECURITY} / Tests: ${TESTS} / Build: ${BUILD}|")
+          curl -s -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK"

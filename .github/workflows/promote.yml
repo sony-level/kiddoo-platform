@@ -1,0 +1,190 @@
+# =============================================================================
+# Auto-Promotion Pipeline — Automatic PR creation between branches
+#
+# After a successful CD pipeline on a branch, this workflow automatically
+# creates a Pull Request to promote changes to the next environment:
+#
+#   develop    --> PR to release/main   (dev -> staging)
+#   release/*  --> PR to master         (staging -> production)
+#
+# This ensures a continuous flow from development to production with
+# proper review gates at each step.
+#
+# Required secrets:
+#   USED_PERMISSION — PAT with repo scope (to create PRs that trigger CI)
+#                     Falls back to GITHUB_TOKEN if not set.
+# =============================================================================
+
+name: Auto Promote
+
+on:
+  workflow_run:
+    workflows: ["CD Pipeline"]
+    types: [completed]
+    branches:
+      - develop
+      - "release/*"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  promote:
+    name: Create Promotion PR
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.USED_PERMISSION || github.token }}
+          fetch-depth: 0
+
+      - name: Determine promotion target
+        id: target
+        run: |
+          SOURCE_BRANCH="${{ github.event.workflow_run.head_branch }}"
+          echo "source=${SOURCE_BRANCH}" >> $GITHUB_OUTPUT
+
+          if [ "$SOURCE_BRANCH" = "develop" ]; then
+            # Check if a release/* branch exists, otherwise create release/main
+            RELEASE_BRANCH=$(git branch -r --list 'origin/release/*' | head -1 | sed 's|origin/||' | xargs)
+            if [ -z "$RELEASE_BRANCH" ]; then
+              RELEASE_BRANCH="release/main"
+            fi
+            echo "target=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
+            echo "title=Promote develop to ${RELEASE_BRANCH} (staging)" >> $GITHUB_OUTPUT
+            echo "env_from=development" >> $GITHUB_OUTPUT
+            echo "env_to=staging" >> $GITHUB_OUTPUT
+
+          elif [[ "$SOURCE_BRANCH" == release/* ]]; then
+            echo "target=master" >> $GITHUB_OUTPUT
+            echo "title=Promote ${SOURCE_BRANCH} to master (production)" >> $GITHUB_OUTPUT
+            echo "env_from=staging" >> $GITHUB_OUTPUT
+            echo "env_to=production" >> $GITHUB_OUTPUT
+
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No promotion target for branch: ${SOURCE_BRANCH}"
+          fi
+
+      - name: Check if PR already exists
+        if: steps.target.outputs.skip != 'true'
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.USED_PERMISSION || github.token }}
+        run: |
+          SOURCE="${{ steps.target.outputs.source }}"
+          TARGET="${{ steps.target.outputs.target }}"
+
+          EXISTING=$(gh pr list \
+            --head "$SOURCE" \
+            --base "$TARGET" \
+            --state open \
+            --json number \
+            --jq 'length')
+
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "PR already exists from ${SOURCE} to ${TARGET}, skipping"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create promotion PR
+        if: steps.target.outputs.skip != 'true' && steps.check_pr.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.USED_PERMISSION || github.token }}
+        run: |
+          SOURCE="${{ steps.target.outputs.source }}"
+          TARGET="${{ steps.target.outputs.target }}"
+          TITLE="${{ steps.target.outputs.title }}"
+          ENV_FROM="${{ steps.target.outputs.env_from }}"
+          ENV_TO="${{ steps.target.outputs.env_to }}"
+          RUN_URL="${{ github.event.workflow_run.html_url }}"
+
+          BODY=$(cat <<EOF
+          ## Promotion automatique: ${ENV_FROM} -> ${ENV_TO}
+
+          Cette PR a ete creee automatiquement apres le succes du pipeline CD.
+
+          | Champ | Valeur |
+          |-------|--------|
+          | Source | \`${SOURCE}\` |
+          | Cible | \`${TARGET}\` |
+          | Environnement actuel | ${ENV_FROM} |
+          | Environnement cible | ${ENV_TO} |
+          | Pipeline CD | [Voir les logs](${RUN_URL}) |
+
+          ### Checklist avant merge
+          - [ ] Revue de code effectuee
+          - [ ] Tests de l'environnement ${ENV_FROM} valides
+          - [ ] Pas de regression constatee
+          - [ ] Version coherente dans Cargo.toml
+
+          ### Actions apres merge
+          - Le pipeline CD se declenchera automatiquement sur \`${TARGET}\`
+          - ArgoCD deploiera les changements dans l'environnement **${ENV_TO}**
+          EOF
+          )
+
+          gh pr create \
+            --head "$SOURCE" \
+            --base "$TARGET" \
+            --title "$TITLE" \
+            --body "$BODY" \
+            --label "promotion,automated"
+
+          echo "Created PR: ${SOURCE} -> ${TARGET}"
+
+      - name: Summary
+        if: steps.target.outputs.skip != 'true'
+        run: |
+          SOURCE="${{ steps.target.outputs.source }}"
+          TARGET="${{ steps.target.outputs.target }}"
+          EXISTS="${{ steps.check_pr.outputs.exists }}"
+
+          {
+            echo "## Auto-Promotion"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Source | \`${SOURCE}\` |"
+            echo "| Target | \`${TARGET}\` |"
+            if [ "$EXISTS" = "true" ]; then
+              echo "| Status | PR already exists |"
+            else
+              echo "| Status | PR created |"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Discord notification
+        if: steps.target.outputs.skip != 'true' && steps.check_pr.outputs.exists == 'false'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          [ -z "$DISCORD_WEBHOOK" ] && echo "No Discord webhook" && exit 0
+
+          SOURCE="${{ steps.target.outputs.source }}"
+          TARGET="${{ steps.target.outputs.target }}"
+          ENV_TO="${{ steps.target.outputs.env_to }}"
+
+          PAYLOAD=$(cat <<'INNEREOF'
+          {
+            "embeds": [{
+              "title": "TITLE_PLACEHOLDER",
+              "description": "DESC_PLACEHOLDER",
+              "url": "URL_PLACEHOLDER",
+              "color": 7506394,
+              "footer": { "text": "GitHub Actions — Auto Promote" }
+            }]
+          }
+          INNEREOF
+          )
+
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|TITLE_PLACEHOLDER|PR de promotion creee: ${ENV_TO}|")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|DESC_PLACEHOLDER|${SOURCE} -> ${TARGET}|")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/pulls|")
+          curl -s -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK"
