@@ -1,7 +1,7 @@
 
 [workspace]  # Workspace for baby sitting service
 members = [
-    "libs/database", "services/api-gateway", "services/identity-proxy", "services/orchestrator",
+    "libs/database", "libs/metrics", "services/api-gateway", "services/identity-proxy", "services/orchestrator",
 ]
 resolver = "2"
 default-run = "orchestrator"
