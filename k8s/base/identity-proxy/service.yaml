@@ -4,6 +4,10 @@ metadata:
   name: identity-proxy
   labels:
     app: identity-proxy
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
   selector:

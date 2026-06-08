@@ -32,6 +32,7 @@ fn rocket() -> _ {
 
     rocket::build()
         .manage(proxy_client)
+        .attach(metrics::PrometheusMetrics::new("api-gateway"))
         .mount(
             "/api/v1",
             routes![
@@ -44,6 +45,7 @@ fn rocket() -> _ {
                 routes::me,
             ],
         )
+        .mount("/", rocket::routes![metrics::metrics_endpoint])
         .mount(
             "/",
             SwaggerUi::new("/api/v1/swagger-ui/<_..>")

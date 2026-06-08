@@ -38,6 +38,9 @@ utoipa-swagger-ui = { version = "9", features = ["rocket"] }
 # Database
 database = { path = "../../libs/database" }
 
+# Monitoring
+metrics = { path = "../../libs/metrics" }
+
 # Utils
 dotenvy = "0.15"
 urlencoding = "2.1"
