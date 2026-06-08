@@ -12,7 +12,7 @@ spec:
   project: kiddoo
   source:
     repoURL: https://github.com/sony-level/kiddoo-platform.git
-    targetRevision: HEAD
+    targetRevision: develop
     path: k8s/overlays/test
   destination:
     server: https://kubernetes.default.svc

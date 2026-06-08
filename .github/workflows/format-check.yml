@@ -10,13 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       format-passed: ${{ steps.check.outputs.formatted }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.USED_PERMISISON }}
-          ref: ${{ github.head_ref }}
+          token: ${{ secrets.USED_PERMISSION || github.token }}
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -45,7 +45,7 @@ jobs:
         if: steps.check.outputs.formatted == 'false'
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.USED_PERMISISON }}
+          token: ${{ secrets.USED_PERMISSION || github.token }}
           commit-message: "auto: format code according to rustfmt standards"
           committer: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
@@ -54,11 +54,11 @@ jobs:
           title: "[Auto] Fix code formatting for ${{ github.ref_name }}"
           body: |
             This PR was automatically created to fix code formatting issues.
-            
+
             **Changes:**
             - Applied `cargo fmt --all` to fix formatting
-            
+
             **Original branch:** `${{ github.ref_name }}`
-            
+
             Please review and merge to apply the formatting fixes.
           labels: auto-format, ci-cd
