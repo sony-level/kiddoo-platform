@@ -1,0 +1,28 @@
+# =============================================================================
+# ServiceMonitor — Prometheus Operator auto-discovery
+#
+# Tells Prometheus to scrape /metrics from kiddoo services.
+# Requires: prometheus-operator (kube-prometheus-stack) installed on cluster.
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kiddoo-services
+  labels:
+    app.kubernetes.io/part-of: kiddoo-platform
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kiddoo-platform
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - kiddoo-dev
+      - kiddoo-test
+      - kiddoo-staging
+      - kiddoo-production

@@ -26,6 +26,9 @@ utoipa-swagger-ui = { version = "9", features = ["rocket"] }
 # Identity Proxy (for shared models)
 identity-proxy = { path = "../identity-proxy" }
 
+# Monitoring
+metrics = { path = "../../libs/metrics" }
+
 # Utils
 dotenvy = "0.15"
 thiserror = "2"

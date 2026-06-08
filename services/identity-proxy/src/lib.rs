@@ -38,6 +38,7 @@ pub fn create_rocket() -> rocket::Rocket<rocket::Build> {
     rocket::build()
         .manage(keycloak_service)
         .manage(jwks_verifier)
+        .attach(metrics::PrometheusMetrics::new("identity-proxy"))
         .mount(
             "/api/v1",
             routes![
@@ -50,4 +51,5 @@ pub fn create_rocket() -> rocket::Rocket<rocket::Build> {
                 routes::me,
             ],
         )
+        .mount("/", rocket::routes![metrics::metrics_endpoint])
 }
