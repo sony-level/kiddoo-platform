@@ -156,5 +156,5 @@ jobs:
           PAYLOAD=$(echo "$PAYLOAD" | sed "s|TITLE_PLACEHOLDER|${TITLE}|")
           PAYLOAD=$(echo "$PAYLOAD" | sed "s|COLOR_PLACEHOLDER|${COLOR}|")
           PAYLOAD=$(echo "$PAYLOAD" | sed "s|URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|")
-          PAYLOAD=$(echo "$PAYLOAD" | sed "s|DESC_PLACEHOLDER|${{ github.repository }} #${{ github.run_number }} | Branch: ${{ github.ref_name }} | ${STATUS} | Format: ${FORMAT} Security: ${SECURITY} Tests: ${TESTS} Build: ${BUILD}|")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|DESC_PLACEHOLDER|${{ github.repository }} #${{ github.run_number }} / Branch: ${{ github.ref_name }} / ${STATUS} / Format: ${FORMAT} / Security: ${SECURITY} / Tests: ${TESTS} / Build: ${BUILD}|")
           curl -s -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK"
