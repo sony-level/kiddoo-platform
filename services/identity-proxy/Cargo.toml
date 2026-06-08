@@ -22,10 +22,10 @@ tokio = { version = "1", features = ["full"] }
 
 # Keycloak/OIDC
 openidconnect = "4.0.1"
-jsonwebtoken = "10.3"
+jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
 
 # HTTP client
-reqwest = { version = "0.13", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13", features = ["json", "rustls", "form"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -37,6 +37,9 @@ utoipa-swagger-ui = { version = "9", features = ["rocket"] }
 
 # Database
 database = { path = "../../libs/database" }
+
+# Monitoring
+metrics = { path = "../../libs/metrics" }
 
 # Utils
 dotenvy = "0.15"
@@ -50,3 +53,4 @@ uuid = { version = "1.19.0", features = ["v4", "serde"] }
 # Testing
 wiremock = "0.6"
 tokio-test = "0.4"
+base64 = "0.22"

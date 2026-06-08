@@ -32,6 +32,7 @@ fn rocket() -> _ {
 
     rocket::build()
         .manage(proxy_client)
+        .attach(metrics::PrometheusMetrics::new("api-gateway"))
         .mount(
             "/api/v1",
             routes![
@@ -44,8 +45,10 @@ fn rocket() -> _ {
                 routes::me,
             ],
         )
+        .mount("/", rocket::routes![metrics::metrics_endpoint])
         .mount(
             "/",
-            SwaggerUi::new("/swagger-ui/<_..>").url("/api-docs/openapi.json", ApiDoc::openapi()),
+            SwaggerUi::new("/api/v1/swagger-ui/<_..>")
+                .url("/api/v1/api-docs/openapi.json", ApiDoc::openapi()),
         )
 }

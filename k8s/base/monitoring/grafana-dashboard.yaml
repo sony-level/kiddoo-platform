@@ -1,0 +1,154 @@
+# =============================================================================
+# Grafana Dashboard ConfigMap
+#
+# Auto-provisioned by Grafana sidecar (kube-prometheus-stack).
+# Label grafana_dashboard: "1" is required for auto-discovery.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kiddoo-grafana-dashboard
+  labels:
+    app.kubernetes.io/part-of: kiddoo-platform
+    grafana_dashboard: "1"
+data:
+  kiddoo-overview.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "title": "Request Rate (req/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(kiddoo_http_requests_total[5m])) by (service)",
+              "legendFormat": "{{ service }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqps" }
+          }
+        },
+        {
+          "title": "Error Rate (%)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(kiddoo_http_requests_total{status=~\"5..\"}[5m])) by (service) / sum(rate(kiddoo_http_requests_total[5m])) by (service) * 100",
+              "legendFormat": "{{ service }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 1 }] } }
+          }
+        },
+        {
+          "title": "Response Time p50 / p99",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(kiddoo_http_request_duration_seconds_bucket[5m])) by (le, service))",
+              "legendFormat": "p50 {{ service }}"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(kiddoo_http_request_duration_seconds_bucket[5m])) by (le, service))",
+              "legendFormat": "p99 {{ service }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "title": "Requests In Flight",
+          "type": "gauge",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+          "targets": [
+            {
+              "expr": "kiddoo_http_requests_in_flight",
+              "legendFormat": "in-flight"
+            }
+          ]
+        },
+        {
+          "title": "Auth Attempts",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(kiddoo_auth_attempts_total[5m])) by (service, result)",
+              "legendFormat": "{{ service }} {{ result }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqps" }
+          }
+        },
+        {
+          "title": "Downstream Latency p99",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(kiddoo_downstream_request_duration_seconds_bucket[5m])) by (le, target_service))",
+              "legendFormat": "p99 → {{ target_service }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "title": "CPU Usage by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"kiddoo-.*\"}[5m])) by (pod)",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit" }
+          }
+        },
+        {
+          "title": "Memory Usage by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=~\"kiddoo-.*\"}) by (pod)",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes" }
+          }
+        },
+        {
+          "title": "Pod Restarts",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"kiddoo-.*\"}[1h])) by (pod)",
+              "legendFormat": "{{ pod }}"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["kiddoo", "platform", "sla"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "Kiddoo Platform Overview",
+      "uid": "kiddoo-overview"
+    }

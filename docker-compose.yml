@@ -1,0 +1,133 @@
+# =============================================================================
+# Docker Compose — Kiddoo Platform (Local Development)
+#
+# Services:
+#   postgres         — PostgreSQL 16 database
+#   migrations       — Diesel migrations (run once then exits)
+#   identity-proxy   — Auth service (port 8001)
+#   api-gateway      — Main API + Swagger UI (port 8000)
+#
+# Usage:
+#   docker compose up -d                  # Start all services
+#   docker compose up -d --build          # Rebuild and start
+#   docker compose logs -f api-gateway    # Follow logs
+#   docker compose down -v                # Stop and remove volumes
+#
+# Requires: .env file (copy from .env.example or run: make env ENV=development)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-bookworm
+    container_name: kiddoo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kiddoo_dev
+      POSTGRES_USER: kiddoo
+      POSTGRES_PASSWORD: kiddoo_dev_pwd
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kiddoo -d kiddoo_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Database Migrations (Diesel)
+  # ---------------------------------------------------------------------------
+  migrations:
+    image: rust:1-bookworm
+    container_name: kiddoo-migrations
+    working_dir: /app/libs/database
+    volumes:
+      - .:/app
+    environment:
+      DATABASE_URL: postgres://kiddoo:kiddoo_dev_pwd@postgres:5432/kiddoo_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      bash -c "
+        cargo install diesel_cli --no-default-features --features postgres &&
+        diesel migration run &&
+        echo '✓ Migrations applied successfully'
+      "
+
+  # ---------------------------------------------------------------------------
+  # Identity Proxy — Auth service (Keycloak integration)
+  # ---------------------------------------------------------------------------
+  identity-proxy:
+    build:
+      context: .
+      dockerfile: services/identity-proxy/Dockerfile
+    container_name: kiddoo-identity-proxy
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      ROCKET_ADDRESS: "0.0.0.0"
+      ROCKET_PORT: 8001
+      ROCKET_LOG_LEVEL: ${ROCKET_LOG_LEVEL:-debug}
+      RUST_LOG: ${RUST_LOG:-debug,tower_http=debug}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgres://kiddoo:kiddoo_dev_pwd@postgres:5432/kiddoo_dev
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-https://your-keycloak-server.com}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-your-realm}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-your-client-id}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-your-client-secret}
+      OAUTH_STATE: ${OAUTH_STATE:-random-state-string}
+      REDIRECT_URI: ${REDIRECT_URI:-http://localhost:8000/api/v1/auth/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      JWKS_CACHE_TTL_SECONDS: ${JWKS_CACHE_TTL_SECONDS:-300}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # API Gateway — Main API + Swagger UI
+  # ---------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: kiddoo-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ROCKET_ADDRESS: "0.0.0.0"
+      ROCKET_PORT: 8000
+      ROCKET_LOG_LEVEL: ${ROCKET_LOG_LEVEL:-debug}
+      RUST_LOG: ${RUST_LOG:-debug,tower_http=debug}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      GATEWAY_PORT: 8000
+      IDENTITY_PROXY_URL: http://identity-proxy:8001
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+    depends_on:
+      identity-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:
+    driver: local

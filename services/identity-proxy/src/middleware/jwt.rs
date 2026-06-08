@@ -34,6 +34,7 @@ struct Jwks {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct Jwk {
     kid: Option<String>,
     kty: String,
@@ -149,22 +150,20 @@ impl JwksVerifier {
     async fn decoding_key_for_kid(&self, kid: &str) -> Result<Arc<DecodingKey>, AuthError> {
         {
             let cache = self.cache.read().await;
-            if let Some(cached) = cache.as_ref() {
-                if self.cache_valid(cached) {
-                    if let Some(key) = cached.keys_by_kid.get(kid) {
-                        return Ok(Arc::clone(key));
-                    }
-                }
+            if let Some(cached) = cache.as_ref()
+                && self.cache_valid(cached)
+                && let Some(key) = cached.keys_by_kid.get(kid)
+            {
+                return Ok(Arc::clone(key));
             }
         }
 
         let mut cache = self.cache.write().await;
-        if let Some(cached) = cache.as_ref() {
-            if self.cache_valid(cached) {
-                if let Some(key) = cached.keys_by_kid.get(kid) {
-                    return Ok(Arc::clone(key));
-                }
-            }
+        if let Some(cached) = cache.as_ref()
+            && self.cache_valid(cached)
+            && let Some(key) = cached.keys_by_kid.get(kid)
+        {
+            return Ok(Arc::clone(key));
         }
 
         let refreshed = self.refresh_jwks().await?;
@@ -206,10 +205,10 @@ impl JwksVerifier {
             roles.extend(ra.roles.clone());
         }
 
-        if let Some(resources) = claims.resource_access.as_ref() {
-            if let Some(access) = resources.get(&self.client_id) {
-                roles.extend(access.roles.clone());
-            }
+        if let Some(resources) = claims.resource_access.as_ref()
+            && let Some(access) = resources.get(&self.client_id)
+        {
+            roles.extend(access.roles.clone());
         }
 
         roles.sort();

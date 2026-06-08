@@ -1,0 +1,144 @@
+name: "Bug Report - Test Environment"
+description: "Report a bug found during testing in the test environment"
+title: "[TEST-BUG] "
+labels: ["bug", "test-environment", "needs-fix"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Test Environment Bug Report
+        Use this form to report a bug found during testing on the
+        test environment to the development team.
+
+  - type: input
+    id: version
+    attributes:
+      label: "Tested version"
+      description: "The deployed version tag (visible in the workflow or ArgoCD)"
+      placeholder: "e.g. 0.1.0-test-42"
+    validations:
+      required: true
+
+  - type: input
+    id: branch
+    attributes:
+      label: "Source branch"
+      description: "The branch from which the version was built"
+      placeholder: "e.g. release/0.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: service
+    attributes:
+      label: "Affected service"
+      description: "Which micro-service is impacted?"
+      options:
+        - api-gateway
+        - identity-proxy
+        - orchestrator
+        - infrastructure (K8s / ArgoCD)
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "Severity"
+      description: "Impact of the bug"
+      options:
+        - critical (blocking, data loss)
+        - major (feature unavailable)
+        - minor (unexpected behavior, workaround exists)
+        - cosmetic (display, documentation)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: test_type
+    attributes:
+      label: "Test type"
+      description: "At which level was the bug detected?"
+      options:
+        - smoke test (health check)
+        - integration test
+        - E2E test (end-to-end)
+        - manual test
+        - performance test
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Bug description"
+      description: "Describe the observed behavior vs the expected behavior"
+      placeholder: |
+        **Expected behavior:**
+        GET /api/v1/health returns status 200 with body {"status": "ok"}
+
+        **Observed behavior:**
+        The endpoint returns status 503 with message "database connection failed"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to reproduce"
+      description: "Precise steps to reproduce the bug"
+      placeholder: |
+        1. Deploy version 0.1.0-test-42 to test
+        2. Wait for ArgoCD sync
+        3. Call GET /api/v1/health
+        4. Observe status code 503
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / error traces"
+      description: "Paste relevant logs (kubectl logs, test output, etc.)"
+      render: shell
+      placeholder: |
+        $ kubectl logs -n kiddoo-test deployment/test-api-gateway
+        ERROR: database connection refused at 10.0.1.5:5432
+
+  - type: input
+    id: run_url
+    attributes:
+      label: "GitHub Actions run link"
+      description: "URL of the test run that detected the issue"
+      placeholder: "https://github.com/sony-level/kiddoo-platform/actions/runs/..."
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environment information"
+      description: "Technical context of the test environment"
+      value: |
+        - **Cluster**: EKS (eu-north-1)
+        - **Namespace**: kiddoo-test
+        - **ArgoCD App**: kiddoo-test
+        - **Registry**: GHCR (ghcr.io/sony-level)
+
+  - type: textarea
+    id: fix_suggestions
+    attributes:
+      label: "Suggested fix (optional)"
+      description: "If you have hypotheses about the root cause or fix suggestions"
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Checklist"
+      options:
+        - label: "I verified the bug is reproducible"
+          required: true
+        - label: "I checked the logs of the affected pod"
+          required: false
+        - label: "I verified this issue does not already exist in open issues"
+          required: true

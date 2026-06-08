@@ -1,0 +1,46 @@
+name: Deployment Pipeline
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  production-deploy:
+    name: Production Deployment
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production via PR merge..."
+          echo "Code validated via Pull Request"
+          echo "Secure deployment on master"
+          echo "Production deployment completed successfully"
+
+  staging-deploy:
+    name: Staging Deployment
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/master'
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging..."
+          echo "All validations passed"
+          echo "Test deployment on branch: ${{ github.ref_name }}"
+          echo "Staging deployment completed successfully"

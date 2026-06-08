@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-proxy
+  labels:
+    app: identity-proxy
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: identity-proxy
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
+      name: http
