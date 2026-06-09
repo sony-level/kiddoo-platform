@@ -27,6 +27,7 @@ spec:
       containers:
         - name: identity-proxy
           image: ghcr.io/sony-level/kiddoo-identity-proxy:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8001
               protocol: TCP
