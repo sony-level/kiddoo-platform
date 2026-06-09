@@ -1,0 +1,48 @@
+# =============================================================================
+# Prometheus en mode AGENT (cluster k3s applicatif)
+#
+# Role : scraper les services Kiddoo via les ServiceMonitor, puis pousser
+#        (remote_write) les metriques vers le Prometheus central distant.
+#
+# Applique avec :
+#   helm upgrade prometheus prometheus-community/kube-prometheus-stack \
+#     -n monitoring -f prometheus/prometheus-agent-values.yaml
+# =============================================================================
+
+prometheus:
+  agentMode: true                      # scrape + forward uniquement (pas de TSDB/UI/regles)
+  prometheusSpec:
+    # Decouvre TOUS les ServiceMonitor du cluster (pas seulement release=prometheus)
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+
+    # Ajoute un label d'origine a chaque serie -> on distingue les clusters cote central
+    externalLabels:
+      cluster: kiddoo-k3s
+      origin: k3s-applicatif
+
+    # Pousse les metriques vers le Prometheus central
+    remoteWrite:
+      - url: https://prometheus.level-sony.cloud/api/v1/write
+        # Decommentez si le central est protege par basic-auth (recommande) :
+        # basicAuth:
+        #   username:
+        #     name: remote-write-auth
+        #     key: username
+        #   password:
+        #     name: remote-write-auth
+        #     key: password
+        queueConfig:
+          capacity: 10000
+          maxShards: 5
+          maxSamplesPerSend: 2000
+
+# Composants inutiles localement : ils vivent sur le serveur distant
+grafana:
+  enabled: false
+alertmanager:
+  enabled: false
+
+# En mode agent, les regles ne sont pas evaluees ici -> on n'a pas besoin
+# du sidecar de rules local. Les PrometheusRule kiddoo seront evaluees
+# sur le Prometheus CENTRAL.
