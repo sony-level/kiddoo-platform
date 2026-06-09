@@ -27,6 +27,7 @@ spec:
       containers:
         - name: api-gateway
           image: ghcr.io/sony-level/kiddoo-api-gateway:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
               protocol: TCP
