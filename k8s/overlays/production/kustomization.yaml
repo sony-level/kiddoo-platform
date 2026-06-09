@@ -29,10 +29,10 @@ patches:
 images:
   - name: ghcr.io/sony-level/kiddoo-api-gateway
     newName: ghcr.io/sony-level/kiddoo-api-gateway
-    newTag: stable
+    newTag: "0.1.0-7"
   - name: ghcr.io/sony-level/kiddoo-identity-proxy
     newName: ghcr.io/sony-level/kiddoo-identity-proxy
-    newTag: stable
+    newTag: "0.1.0-7"
 
 commonLabels:
   environment: production
