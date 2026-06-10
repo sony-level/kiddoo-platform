@@ -12,8 +12,8 @@ resources:
   - identity-proxy/deployment.yaml
   - identity-proxy/service.yaml
   - monitoring/service-monitor.yaml
-  - monitoring/prometheus-rules.yaml
-  - monitoring/grafana-dashboard.yaml
+ # - monitoring/prometheus-rules.yaml
+ # - monitoring/grafana-dashboard.yaml
 
 commonLabels:
   app.kubernetes.io/managed-by: argocd

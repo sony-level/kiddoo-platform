@@ -25,6 +25,14 @@ Agent.md
 .env.test
 .env.staging
 .env.production
+
+# Secrets — never commit (IAM keys, secret values, kubeconfig)
+secrets/
+awssm-secret*.yaml
+*-secret-values.yaml
+*.kubeconfig
+kubeconfig
+
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
