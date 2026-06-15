@@ -1,4 +1,4 @@
-FROM rust:1-trixie AS builder
+FROM rust:1-bookworm AS builder
 
 LABEL maintainer="sony-level"
 
@@ -6,7 +6,7 @@ WORKDIR /app
 COPY . .
 RUN cargo build --release -p identity-proxy
 
-FROM debian:trixie-slim
+FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
