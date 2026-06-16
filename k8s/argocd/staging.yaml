@@ -6,6 +6,10 @@ metadata:
   labels:
     app.kubernetes.io/part-of: kiddoo-platform
     environment: staging
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.discord: kiddoo-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.discord: kiddoo-alerts
+    notifications.argoproj.io/subscribe.on-sync-failed.discord: kiddoo-alerts
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -26,13 +30,14 @@ spec:
       - ApplyOutOfSyncOnly=true
       - ServerSideApply=true
     retry:
-      limit: 3
+      limit: 5
       backoff:
-        duration: 5s
+        duration: 10s
         factor: 2
-        maxDuration: 3m
+        maxDuration: 5m
   ignoreDifferences:
     - group: apps
       kind: Deployment
       jsonPointers:
         - /spec/replicas
+  revisionHistoryLimit: 5
