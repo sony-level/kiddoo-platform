@@ -6,6 +6,9 @@ metadata:
   labels:
     app.kubernetes.io/part-of: kiddoo-platform
     environment: dev
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.discord: kiddoo-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.discord: kiddoo-alerts
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -36,3 +39,4 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/replicas
+  revisionHistoryLimit: 3

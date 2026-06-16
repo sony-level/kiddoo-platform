@@ -11,6 +11,7 @@ namePrefix: prod-
 patches:
   - path: configmap-patch.yaml
   - path: secret-patch.yaml
+  - path: ingress-patch.yaml
   - target:
       kind: Deployment
       name: api-gateway
@@ -29,10 +30,10 @@ patches:
 images:
   - name: ghcr.io/sony-level/kiddoo-api-gateway
     newName: ghcr.io/sony-level/kiddoo-api-gateway
-    newTag: "0.1.0-8"
+    newTag: "stable"
   - name: ghcr.io/sony-level/kiddoo-identity-proxy
     newName: ghcr.io/sony-level/kiddoo-identity-proxy
-    newTag: "0.1.0-8"
+    newTag: "stable"
 
 commonLabels:
   environment: production

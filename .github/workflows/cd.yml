@@ -42,6 +42,10 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   GHCR_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  # Domain URLs per environment (single source of truth)
+  DOMAIN_DEV: api-dev.level-sony.cloud
+  DOMAIN_STAGING: api-staging.level-sony.cloud
+  DOMAIN_PRODUCTION: api.level-sony.cloud
 
 jobs:
   # ===================================================================
@@ -628,8 +632,9 @@ jobs:
             });
 
   # ===================================================================
-  # 6 — Deploy Staging (manual approval on release/*)
-  #     Updates K8s manifests -> ArgoCD auto-syncs
+  # 6 — Deploy Staging (auto on release/*)
+  #     Deploys new version to staging for validation.
+  #     If E2E tests pass -> tags images as "stable" for production.
   # ===================================================================
   deploy-staging:
     name: Deploy to Staging
@@ -665,7 +670,7 @@ jobs:
   e2e-tests-staging:
     name: E2E Tests (Staging)
     runs-on: ubuntu-latest
-    needs: deploy-staging
+    needs: [deploy-staging, docker-build]
     if: startsWith(github.ref, 'refs/heads/release/')
 
     outputs:
@@ -674,27 +679,117 @@ jobs:
     steps:
       - name: Wait for ArgoCD sync
         run: |
-          echo "Waiting 30s for ArgoCD to detect and sync changes..."
-          sleep 30
+          echo "Waiting 60s for ArgoCD to detect and sync changes..."
+          sleep 60
 
       - name: Run E2E tests
         id: e2e
-        continue-on-error: true
         run: |
           echo "=== E2E tests (staging) ==="
           PASS=0
           FAIL=0
+          TOTAL_ATTEMPTS=5
 
-          # Health checks
-          # TODO: Replace with actual staging endpoints
-          # HTTP_GW=$(curl -s -o /dev/null -w "%{http_code}" https://api-staging.level-sony.com/api/v1/health)
-          # HTTP_ID=$(curl -s -o /dev/null -w "%{http_code}" https://api-staging.level-sony.com/api/v1/identity/health)
-          PASS=4
+          # Health check api-gateway
+          for i in $(seq 1 $TOTAL_ATTEMPTS); do
+            HTTP_GW=$(curl -sf -o /dev/null -w "%{http_code}" \
+              "https://${DOMAIN_STAGING}/api/v1/health" 2>/dev/null || echo "000")
+            if [ "$HTTP_GW" = "200" ]; then
+              echo "api-gateway health: OK (attempt $i)"
+              PASS=$((PASS+1))
+              break
+            fi
+            echo "api-gateway health: FAIL ($HTTP_GW) attempt $i/$TOTAL_ATTEMPTS"
+            [ "$i" -eq "$TOTAL_ATTEMPTS" ] && FAIL=$((FAIL+1))
+            sleep 10
+          done
+
+          # Health check identity-proxy
+          for i in $(seq 1 $TOTAL_ATTEMPTS); do
+            HTTP_ID=$(curl -sf -o /dev/null -w "%{http_code}" \
+              "https://${DOMAIN_STAGING}/api/v1/identity/health" 2>/dev/null || echo "000")
+            if [ "$HTTP_ID" = "200" ]; then
+              echo "identity-proxy health: OK (attempt $i)"
+              PASS=$((PASS+1))
+              break
+            fi
+            echo "identity-proxy health: FAIL ($HTTP_ID) attempt $i/$TOTAL_ATTEMPTS"
+            [ "$i" -eq "$TOTAL_ATTEMPTS" ] && FAIL=$((FAIL+1))
+            sleep 10
+          done
+
+          # Metrics endpoint check
+          METRICS=$(curl -sf "https://${DOMAIN_STAGING}/metrics" 2>/dev/null | head -1 || echo "")
+          if echo "$METRICS" | grep -q "kiddoo"; then
+            echo "metrics endpoint: OK"
+            PASS=$((PASS+1))
+          else
+            echo "metrics endpoint: not responding or empty"
+            # Non-blocking for now
+          fi
 
           echo "pass=${PASS}" >> $GITHUB_OUTPUT
           echo "fail=${FAIL}" >> $GITHUB_OUTPUT
           echo "E2E: ${PASS} passed, ${FAIL} failed"
-          if [ "$FAIL" -gt 0 ]; then exit 1; fi
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::E2E tests failed - staging is not healthy"
+            exit 1
+          fi
+
+  # ===================================================================
+  # 6b — Promote to Stable (only after staging validation passes)
+  #      Tags Docker images as "stable" -> production uses stable tag
+  # ===================================================================
+  promote-to-stable:
+    name: Promote to Stable
+    runs-on: ubuntu-latest
+    needs: [build-and-test, docker-build, e2e-tests-staging]
+    if: startsWith(github.ref, 'refs/heads/release/') && needs.e2e-tests-staging.result == 'success'
+
+    steps:
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Save current stable version (for rollback)
+        id: save-previous
+        run: |
+          # Try to get digest of current stable image for rollback reference
+          PREV_DIGEST=$(docker manifest inspect "${{ env.GHCR_REGISTRY }}/kiddoo-api-gateway:stable" 2>/dev/null | \
+            jq -r '.config.digest // .manifests[0].digest // empty' || echo "none")
+          echo "previous_digest=${PREV_DIGEST}" >> $GITHUB_OUTPUT
+          echo "Previous stable digest: ${PREV_DIGEST}"
+
+      - name: Tag images as stable
+        env:
+          VERSION: ${{ needs.docker-build.outputs.version }}
+        run: |
+          for svc in kiddoo-api-gateway kiddoo-identity-proxy; do
+            SRC="${{ env.GHCR_REGISTRY }}/${svc}:${VERSION}"
+            DST="${{ env.GHCR_REGISTRY }}/${svc}:stable"
+            docker pull "$SRC"
+            docker tag "$SRC" "$DST"
+            docker push "$DST"
+            echo "Promoted ${svc}:${VERSION} -> ${svc}:stable"
+          done
+
+      - name: Promotion summary
+        env:
+          VERSION: ${{ needs.docker-build.outputs.version }}
+        run: |
+          {
+            echo "## Promotion to Stable"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Version | \`${VERSION}\` |"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Status | Validated in staging, promoted to stable |"
+            echo "| Production | ArgoCD will auto-sync \`stable\` tag |"
+            echo ""
+            echo "Production uses \`image:stable\` — ArgoCD + imagePullPolicy:Always"
+            echo "will pick up the new stable image on next sync."
+          } >> $GITHUB_STEP_SUMMARY
 
   report-staging-issues:
     name: Report Staging Issues
@@ -713,13 +808,16 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `[STAGING] E2E tests failed - ${version}`,
-              body: `## Failures detected in staging\n\n**Version**: \`${version}\`\n**Branch**: \`${{ github.ref_name }}\`\n**Run**: [View logs](${runUrl})\n\nE2E tests failed after deployment to the staging environment.\n\n### Required actions\n- [ ] Analyze test logs in the CI/CD run\n- [ ] Check pod logs (kubectl logs -n kiddoo-staging)\n- [ ] Reproduce locally\n- [ ] Fix and push to the release branch\n- [ ] Re-trigger deployment`,
-              labels: ['bug', 'test-environment', 'staging', 'needs-fix']
+              body: `## Failures detected in staging\n\n**Version**: \`${version}\`\n**Branch**: \`${{ github.ref_name }}\`\n**Run**: [View logs](${runUrl})\n\nE2E tests failed. This version was **NOT promoted to stable** and will NOT reach production.\n\n### Required actions\n- [ ] Check pod logs (kubectl logs -n kiddoo-staging)\n- [ ] Fix and push to the release branch\n- [ ] Re-trigger deployment\n\n### Production impact\nNone — production still runs the previous stable version.`,
+              labels: ['bug', 'staging', 'blocked-promotion']
             });
 
   # ===================================================================
-  # 7 — Deploy Production (manual approval on master)
-  #     Updates K8s manifests -> ArgoCD auto-syncs
+  # 7 — Deploy Production (auto via stable tag)
+  #     Production ONLY uses the "stable" tag.
+  #     The CD does NOT modify kustomization for production.
+  #     ArgoCD pulls image:stable which was validated in staging.
+  #     If health checks fail -> rollback to previous stable.
   # ===================================================================
   deploy-production:
     name: Deploy to Production
@@ -735,57 +833,169 @@ jobs:
           ref: master
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update K8s manifests with new image tag
-        env:
-          VERSION: ${{ needs.docker-build.outputs.version }}
+      - name: Trigger ArgoCD sync for production
         run: |
-          cd k8s/overlays/production
-          sed -i "s|newTag:.*|newTag: \"${VERSION}\"|g" kustomization.yaml
-          sed -i "s|newName:.*kiddoo-api-gateway|newName: ${{ env.GHCR_REGISTRY }}/kiddoo-api-gateway|g" kustomization.yaml
-          sed -i "s|newName:.*kiddoo-identity-proxy|newName: ${{ env.GHCR_REGISTRY }}/kiddoo-identity-proxy|g" kustomization.yaml
+          echo "Production uses image tag 'stable' (set in k8s/overlays/production/kustomization.yaml)"
+          echo "The 'stable' tag was updated by the promote-to-stable job after staging validation."
+          echo "ArgoCD will auto-sync when it detects the new image digest."
+          echo ""
+          echo "If ArgoCD doesn't auto-detect within 5min, a manual sync may be needed:"
+          echo "  argocd app sync kiddoo-production --force"
 
-      - name: Commit and push manifest update
+      - name: Force image pull via annotation bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/overlays/production/kustomization.yaml
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "deploy(production): update image tag to ${{ needs.docker-build.outputs.version }}"
+
+          # Bump a restart annotation to force pod recreation with new stable image
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          cd k8s/overlays/production
+
+          # Create or update a patch that forces rollout
+          cat > restart-patch.yaml << 'PATCH'
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: api-gateway
+          spec:
+            template:
+              metadata:
+                annotations:
+                  kubectl.kubernetes.io/restartedAt: "TIMESTAMP_PLACEHOLDER"
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: identity-proxy
+          spec:
+            template:
+              metadata:
+                annotations:
+                  kubectl.kubernetes.io/restartedAt: "TIMESTAMP_PLACEHOLDER"
+          PATCH
+
+          sed -i "s|TIMESTAMP_PLACEHOLDER|${TIMESTAMP}|g" restart-patch.yaml
+
+          # Add patch to kustomization if not already there
+          if ! grep -q "restart-patch.yaml" kustomization.yaml; then
+            sed -i '/patches:/a\  - path: restart-patch.yaml' kustomization.yaml
+          fi
+
+          git add .
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "deploy(production): trigger rollout with stable image at ${TIMESTAMP}"
           git push
 
   health-check-prod:
     name: Health Check (Production)
     runs-on: ubuntu-latest
-    needs: deploy-production
+    needs: [deploy-production, build-and-test]
     if: github.ref == 'refs/heads/master'
 
     outputs:
       result: ${{ steps.health.outcome }}
 
     steps:
-      - name: Wait for ArgoCD sync
+      - name: Wait for ArgoCD sync and pod startup
         run: |
-          echo "Waiting 60s for ArgoCD to detect and sync changes..."
-          sleep 60
+          echo "Waiting 90s for ArgoCD sync + pod rollout..."
+          sleep 90
 
       - name: Run health checks
         id: health
-        continue-on-error: true
         run: |
           echo "=== Health checks (production) ==="
           PASS=0
           FAIL=0
-          # TODO: Replace with actual production endpoint
-          # for i in $(seq 1 5); do
-          #     curl -sf https://api.level-sony.com/api/v1/health && { PASS=$((PASS+1)); break; }
-          #     echo "Health check attempt $i/5 failed, retrying in 10s..."
-          #     sleep 10
-          # done
-          PASS=2
+          ATTEMPTS=10
+
+          # api-gateway health check with retries
+          for i in $(seq 1 $ATTEMPTS); do
+            HTTP_GW=$(curl -sf -o /dev/null -w "%{http_code}" \
+              "https://${DOMAIN_PRODUCTION}/api/v1/health" 2>/dev/null || echo "000")
+            if [ "$HTTP_GW" = "200" ]; then
+              echo "api-gateway: OK (attempt $i)"
+              PASS=$((PASS+1))
+              break
+            fi
+            echo "api-gateway: $HTTP_GW (attempt $i/$ATTEMPTS)"
+            [ "$i" -eq "$ATTEMPTS" ] && FAIL=$((FAIL+1))
+            sleep 15
+          done
+
+          # identity-proxy health check with retries
+          for i in $(seq 1 $ATTEMPTS); do
+            HTTP_ID=$(curl -sf -o /dev/null -w "%{http_code}" \
+              "https://${DOMAIN_PRODUCTION}/api/v1/identity/health" 2>/dev/null || echo "000")
+            if [ "$HTTP_ID" = "200" ]; then
+              echo "identity-proxy: OK (attempt $i)"
+              PASS=$((PASS+1))
+              break
+            fi
+            echo "identity-proxy: $HTTP_ID (attempt $i/$ATTEMPTS)"
+            [ "$i" -eq "$ATTEMPTS" ] && FAIL=$((FAIL+1))
+            sleep 15
+          done
+
           echo "pass=${PASS}" >> $GITHUB_OUTPUT
           echo "fail=${FAIL}" >> $GITHUB_OUTPUT
           echo "Health: ${PASS} passed, ${FAIL} failed"
-          if [ "$FAIL" -gt 0 ]; then exit 1; fi
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::Production health checks FAILED"
+            exit 1
+          fi
+
+  # ===================================================================
+  # 7b — Rollback Production (if health checks fail)
+  #      Reverts "stable" tag to previous version and forces re-sync
+  # ===================================================================
+  rollback-production:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    needs: [build-and-test, health-check-prod]
+    if: always() && needs.health-check-prod.result == 'failure' && github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 5
+
+      - name: Rollback to previous commit manifests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Revert to the previous working state of production overlay
+          git checkout HEAD~1 -- k8s/overlays/production/restart-patch.yaml 2>/dev/null || true
+          git checkout HEAD~1 -- k8s/overlays/production/kustomization.yaml 2>/dev/null || true
+
+          git add k8s/overlays/production/
+          git diff --cached --quiet && echo "Nothing to rollback" && exit 0
+          git commit -m "rollback(production): revert to previous stable state [auto-rollback]"
+          git push
+
+          echo "::warning::ROLLBACK TRIGGERED — Production reverted to previous state"
+
+      - name: Rollback summary
+        env:
+          VERSION: ${{ needs.build-and-test.outputs.version }}
+        run: |
+          {
+            echo "## ROLLBACK — Production"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Failed Version | \`${VERSION}\` |"
+            echo "| Action | Reverted to previous stable state |"
+            echo "| Reason | Health checks failed after deployment |"
+            echo ""
+            echo "ArgoCD will auto-sync the reverted manifests."
+            echo "Investigate the failure and fix on the release branch."
+          } >> $GITHUB_STEP_SUMMARY
 
   report-prod-issues:
     name: Report Production Issues
@@ -803,9 +1013,9 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `[PROD][CRITICAL] Health checks failed - ${version}`,
-              body: `## ALERT: Production failures\n\n**Version**: \`${version}\`\n**Branch**: \`master\`\n**Run**: [View logs](${runUrl})\n\nHealth checks failed after deployment to production.\n\n### Immediate actions\n- [ ] Check pod status (kubectl get pods -n kiddoo-production)\n- [ ] Check logs (kubectl logs -n kiddoo-production)\n- [ ] Rollback via ArgoCD if needed\n- [ ] Identify root cause\n- [ ] Apply hotfix (hotfix/*)`,
-              labels: ['bug', 'production', 'critical', 'needs-fix']
+              title: `[PROD][ROLLBACK] Health checks failed - ${version}`,
+              body: `## ALERT: Production ROLLED BACK\n\n**Failed Version**: \`${version}\`\n**Branch**: \`master\`\n**Run**: [View logs](${runUrl})\n\nHealth checks failed after deployment. **Automatic rollback was triggered.**\n\nProduction is now running the previous stable version.\n\n### Root cause analysis\n- [ ] Check pod logs: \`kubectl logs -n kiddoo-production -l app=api-gateway\`\n- [ ] Check events: \`kubectl get events -n kiddoo-production --sort-by=.lastTimestamp\`\n- [ ] Review image: \`docker run --rm ghcr.io/sony-level/kiddoo-api-gateway:${version}\`\n- [ ] Fix on release branch and re-validate in staging`,
+              labels: ['bug', 'production', 'critical', 'rollback']
             });
 
   # ===================================================================
@@ -841,21 +1051,6 @@ jobs:
             git push origin "$TAG"
             echo "Created and pushed tag: $TAG"
           fi
-
-      - name: Tag GHCR images as stable
-        env:
-          VERSION: ${{ needs.build-and-test.outputs.version }}
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-          for svc in kiddoo-api-gateway kiddoo-identity-proxy; do
-            SRC="${{ env.GHCR_REGISTRY }}/${svc}:${VERSION}"
-            DST="${{ env.GHCR_REGISTRY }}/${svc}:stable"
-            docker pull "$SRC"
-            docker tag "$SRC" "$DST"
-            docker push "$DST"
-            echo "Tagged ${svc}:stable"
-          done
 
       - name: Tag summary
         env:

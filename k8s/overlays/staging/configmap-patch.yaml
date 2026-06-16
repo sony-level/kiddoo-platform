@@ -6,4 +6,5 @@ data:
   ROCKET_LOG_LEVEL: "normal"
   RUST_LOG: "info,tower_http=info"
   ENVIRONMENT: "staging"
-  CORS_ALLOWED_ORIGINS: "https://staging.level-sony.com"
+  API_BASE_URL: "https://api-staging.level-sony.cloud"
+  CORS_ALLOWED_ORIGINS: "https://staging.level-sony.cloud"
