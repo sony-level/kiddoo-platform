@@ -6,4 +6,5 @@ data:
   ROCKET_LOG_LEVEL: "debug"
   RUST_LOG: "debug,tower_http=debug"
   ENVIRONMENT: "development"
+  API_BASE_URL: "https://api-dev.level-sony.cloud"
   CORS_ALLOWED_ORIGINS: "*"

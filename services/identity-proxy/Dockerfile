@@ -1,4 +1,4 @@
-FROM rust:1-trixie AS builder
+FROM rust:1-bookworm AS builder
 
 LABEL maintainer="sony-level"
 

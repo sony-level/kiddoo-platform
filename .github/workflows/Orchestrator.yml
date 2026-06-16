@@ -42,9 +42,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   actions: read
   security-events: write
+  pull-requests: write
 
 env:
   CARGO_TERM_COLOR: always
