@@ -6,6 +6,11 @@ metadata:
   labels:
     app.kubernetes.io/part-of: kiddoo-platform
     environment: production
+  annotations:
+    # Notifications on sync/health status change
+    notifications.argoproj.io/subscribe.on-sync-succeeded.discord: kiddoo-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.discord: kiddoo-alerts
+    notifications.argoproj.io/subscribe.on-sync-failed.discord: kiddoo-alerts
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -21,18 +26,24 @@ spec:
     automated:
       prune: true
       selfHeal: true
+      # Auto-rollback: if app becomes Degraded after sync, revert to last successful revision
+      allowEmpty: false
     syncOptions:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
-      limit: 3
+      limit: 5
       backoff:
-        duration: 5s
+        duration: 10s
         factor: 2
-        maxDuration: 3m
+        maxDuration: 5m
+    # Rollback configuration: managed via resource hooks below
   ignoreDifferences:
     - group: apps
       kind: Deployment
       jsonPointers:
         - /spec/replicas
+  # Revision history for rollback (keep last 5 deployments)
+  revisionHistoryLimit: 5

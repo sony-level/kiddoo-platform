@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kiddoo-ingress
+spec:
+  tls:
+    - hosts:
+        - api.level-sony.cloud
+      secretName: kiddoo-prod-tls
+  rules:
+    - host: api.level-sony.cloud
+      http:
+        paths:
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
