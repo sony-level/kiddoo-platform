@@ -6,7 +6,7 @@ spec:
   template:
     metadata:
       annotations:
-        kubectl.kubernetes.io/restartedAt: "2026-06-19T20:55:36Z"
+        kubectl.kubernetes.io/restartedAt: "2026-06-19T23:35:30Z"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -16,4 +16,4 @@ spec:
   template:
     metadata:
       annotations:
-        kubectl.kubernetes.io/restartedAt: "2026-06-19T20:55:36Z"
+        kubectl.kubernetes.io/restartedAt: "2026-06-19T23:35:30Z"
