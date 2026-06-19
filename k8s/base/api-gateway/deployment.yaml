@@ -37,6 +37,11 @@ spec:
           env:
             - name: ROCKET_PORT
               value: "8000"
+            - name: ROCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kiddoo-secrets
+                  key: rocket-secret-key
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
