@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+spec:
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-06-19T20:55:36Z"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-proxy
+spec:
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-06-19T20:55:36Z"
