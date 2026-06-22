@@ -13,7 +13,7 @@ metadata:
   name: kiddoo-alerts
   labels:
     app.kubernetes.io/part-of: kiddoo-platform
-    release: prometheus
+    release: monitoring
 spec:
   groups:
     # =========================================================================
