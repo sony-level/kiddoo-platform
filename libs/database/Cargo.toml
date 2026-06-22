@@ -7,7 +7,7 @@ edition = "2024"
 
 [dependencies]
 diesel = { version = "2.3.5", features = ["postgres", "r2d2"] } # Postgres, connection pool
-diesel-async = { version = "0.7.4", features = ["postgres", "deadpool"] }
+diesel-async = { version = "0.9.0", features = ["postgres", "deadpool"] }
 rocket = { version = "0.5.1", features = ["tls", "secrets"] } # Web framework
 dotenvy = "0.15.6"
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
