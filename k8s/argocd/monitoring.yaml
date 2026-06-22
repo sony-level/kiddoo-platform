@@ -6,21 +6,44 @@ metadata:
   labels:
     app.kubernetes.io/part-of: kiddoo-platform
     environment: monitoring
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io/finalizer
 spec:
   project: kiddoo
-  sources:
-    - repoURL: https://prometheus-community.github.io/helm-charts
-      chart: kube-prometheus-stack
-      targetRevision: "72.*"
-      helm:
-        releaseName: prometheus
-        valueFiles:
-          - $values/k8s/monitoring/values-prometheus.yaml
-    - repoURL: https://github.com/sony-level/kiddoo-platform.git
-      targetRevision: master
-      ref: values
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: "72.*"
+    helm:
+      releaseName: prometheus
+      values: |
+        prometheus:
+          prometheusSpec:
+            retention: 15d
+            serviceMonitorSelectorNilUsesHelmValues: false
+            serviceMonitorNamespaceSelector: {}
+            ruleSelectorNilUsesHelmValues: false
+            ruleNamespaceSelector: {}
+            podMonitorSelectorNilUsesHelmValues: false
+            podMonitorNamespaceSelector: {}
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+            hosts:
+              - prometheus.level-sony.cloud
+            tls:
+              - secretName: prometheus-tls
+                hosts:
+                  - prometheus.level-sony.cloud
+        grafana:
+          enabled: false
+        alertmanager:
+          alertmanagerSpec:
+            retention: 120h
+        nodeExporter:
+          enabled: true
+        kubeStateMetrics:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
@@ -38,10 +61,6 @@ spec:
         factor: 2
         maxDuration: 5m
   ignoreDifferences:
-    - group: apps
-      kind: Deployment
-      jsonPointers:
-        - /spec/replicas
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
       jqPathExpressions:
