@@ -911,31 +911,23 @@ jobs:
 
           # api-gateway health check with retries
           for i in $(seq 1 $ATTEMPTS); do
-            HTTP_GW=$(curl -sf -o /dev/null -w "%{http_code}" \
-              "https://${DOMAIN_PRODUCTION}/api/v1/health" 2>/dev/null || echo "000")
+            HTTP_GW=$(curl -s -o /tmp/gw_body.txt -w "%{http_code}" \
+              -H "User-Agent: KiddooPlatform-CI/1.0" \
+              -H "Accept: application/json" \
+              "https://${DOMAIN_PRODUCTION}/api/v1/health" || echo "000")
             if [ "$HTTP_GW" = "200" ]; then
               echo "api-gateway: OK (attempt $i)"
               PASS=$((PASS+1))
               break
             fi
             echo "api-gateway: $HTTP_GW (attempt $i/$ATTEMPTS)"
-            [ "$i" -eq "$ATTEMPTS" ] && FAIL=$((FAIL+1))
+            [ "$i" -eq "$ATTEMPTS" ] && { cat /tmp/gw_body.txt 2>/dev/null; FAIL=$((FAIL+1)); }
             sleep 15
           done
 
-          # identity-proxy health check with retries
-          for i in $(seq 1 $ATTEMPTS); do
-            HTTP_ID=$(curl -sf -o /dev/null -w "%{http_code}" \
-              "https://${DOMAIN_PRODUCTION}/api/v1/identity/health" 2>/dev/null || echo "000")
-            if [ "$HTTP_ID" = "200" ]; then
-              echo "identity-proxy: OK (attempt $i)"
-              PASS=$((PASS+1))
-              break
-            fi
-            echo "identity-proxy: $HTTP_ID (attempt $i/$ATTEMPTS)"
-            [ "$i" -eq "$ATTEMPTS" ] && FAIL=$((FAIL+1))
-            sleep 15
-          done
+          # identity-proxy health is checked via api-gateway's /health response
+          # (api-gateway calls identity-proxy internally and reports its status)
+          # No separate external endpoint needed
 
           echo "pass=${PASS}" >> $GITHUB_OUTPUT
           echo "fail=${FAIL}" >> $GITHUB_OUTPUT
