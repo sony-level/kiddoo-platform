@@ -8,3 +8,4 @@ data:
   ENVIRONMENT: "development"
   API_BASE_URL: "https://api-dev.level-sony.cloud"
   CORS_ALLOWED_ORIGINS: "*"
+  IDENTITY_PROXY_URL: "http://dev-identity-proxy:8001"

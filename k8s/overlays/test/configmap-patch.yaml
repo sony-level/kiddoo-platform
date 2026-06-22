@@ -7,3 +7,4 @@ data:
   RUST_LOG: "debug,tower_http=debug"
   ENVIRONMENT: "test"
   CORS_ALLOWED_ORIGINS: "https://test.level-sony.com"
+  IDENTITY_PROXY_URL: "http://test-identity-proxy:8001"
