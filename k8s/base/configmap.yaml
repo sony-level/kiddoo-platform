@@ -10,3 +10,4 @@ data:
   RUST_LOG: "info"
   API_GATEWAY_PORT: "8000"
   IDENTITY_PROXY_PORT: "8001"
+  IDENTITY_PROXY_URL: "http://identity-proxy:8001"

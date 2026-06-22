@@ -49,11 +49,64 @@ env:
 
 jobs:
   # ===================================================================
-  # 1 — Build & Test
+  # 0 — Detect Changes (skip jobs if unrelated paths changed)
+  # ===================================================================
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      api-gateway: ${{ steps.filter.outputs.api-gateway }}
+      identity-proxy: ${{ steps.filter.outputs.identity-proxy }}
+      libs: ${{ steps.filter.outputs.libs }}
+      k8s: ${{ steps.filter.outputs.k8s }}
+      services: ${{ steps.filter.outputs.services }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect file changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api-gateway:
+              - 'services/api-gateway/**'
+              - 'libs/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            identity-proxy:
+              - 'services/identity-proxy/**'
+              - 'libs/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            libs:
+              - 'libs/**'
+            k8s:
+              - 'k8s/**'
+            services:
+              - 'services/**'
+              - 'libs/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            docker:
+              - 'services/api-gateway/Dockerfile'
+              - 'services/identity-proxy/Dockerfile'
+              - 'services/**'
+              - 'libs/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+
+  # ===================================================================
+  # 1 — Build & Test (only if services or libs changed)
   # ===================================================================
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.services == 'true'
 
     services:
       postgres:
@@ -139,7 +192,8 @@ jobs:
   cargo-audit:
     name: Cargo Audit
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [detect-changes, build-and-test]
+    if: needs.detect-changes.outputs.services == 'true'
 
     steps:
       - name: Checkout code
@@ -164,7 +218,8 @@ jobs:
   trivy-scan:
     name: Trivy Filesystem & Config Scan
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [detect-changes, build-and-test]
+    if: needs.detect-changes.outputs.services == 'true'
 
     steps:
       - name: Checkout code
@@ -315,8 +370,10 @@ jobs:
   sonarqube:
     name: SonarQube Analysis
     runs-on: ubuntu-latest
-    needs: build-and-test
-    if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/')
+    needs: [detect-changes, build-and-test]
+    if: |
+      needs.detect-changes.outputs.services == 'true' &&
+      (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/'))
 
     steps:
       - name: Configure AWS credentials
@@ -377,7 +434,13 @@ jobs:
   docker-build:
     name: Docker Build & Push (GHCR)
     runs-on: ubuntu-latest
-    needs: [build-and-test, cargo-audit, trivy-scan]
+    needs: [detect-changes, build-and-test, cargo-audit, trivy-scan]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.docker == 'true' &&
+      needs.build-and-test.result == 'success' &&
+      (needs.cargo-audit.result == 'success' || needs.cargo-audit.result == 'skipped') &&
+      (needs.trivy-scan.result == 'success' || needs.trivy-scan.result == 'skipped')
 
     outputs:
       version: ${{ needs.build-and-test.outputs.version }}
