@@ -6,23 +6,18 @@ metadata:
   labels:
     app.kubernetes.io/part-of: kiddoo-platform
     environment: monitoring
-  annotations:
-    notifications.argoproj.io/subscribe.on-sync-succeeded.discord: kiddoo-alerts
-    notifications.argoproj.io/subscribe.on-health-degraded.discord: kiddoo-alerts
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    - resources-finalizer.argocd.argoproj.io/finalizer
 spec:
   project: kiddoo
   sources:
-    # Helm chart from prometheus-community
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack
       targetRevision: "72.*"
       helm:
-        releaseName: monitoring
+        releaseName: prometheus
         valueFiles:
           - $values/k8s/monitoring/values-prometheus.yaml
-    # Values file from our repo
     - repoURL: https://github.com/sony-level/kiddoo-platform.git
       targetRevision: master
       ref: values
@@ -36,7 +31,6 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
