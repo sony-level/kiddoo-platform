@@ -8,3 +8,4 @@ data:
   ENVIRONMENT: "staging"
   API_BASE_URL: "https://api-staging.level-sony.cloud"
   CORS_ALLOWED_ORIGINS: "https://staging.level-sony.cloud"
+  IDENTITY_PROXY_URL: "http://staging-identity-proxy:8001"
