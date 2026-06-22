@@ -1,6 +1,7 @@
 # =============================================================================
 # kube-prometheus-stack Helm values
-# Deployed via ArgoCD into the 'monitoring' namespace
+# Managed by ArgoCD (k8s/argocd/monitoring.yaml)
+# Release name: prometheus | Namespace: monitoring
 # =============================================================================
 
 # -- Prometheus
@@ -14,23 +15,20 @@ prometheus:
           resources:
             requests:
               storage: 10Gi
-    # Scrape all ServiceMonitors across namespaces
+    # Scrape all ServiceMonitors across all namespaces
     serviceMonitorSelectorNilUsesHelmValues: false
     serviceMonitorNamespaceSelector: {}
-    # Scrape all PrometheusRules across namespaces
+    # Scrape all PrometheusRules across all namespaces
     ruleSelectorNilUsesHelmValues: false
     ruleNamespaceSelector: {}
-    # Scrape all PodMonitors across namespaces
+    # Scrape all PodMonitors across all namespaces
     podMonitorSelectorNilUsesHelmValues: false
     podMonitorNamespaceSelector: {}
   ingress:
     enabled: true
     ingressClassName: nginx
     annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      nginx.ingress.kubernetes.io/auth-type: basic
-      nginx.ingress.kubernetes.io/auth-secret: prometheus-basic-auth
-      nginx.ingress.kubernetes.io/auth-realm: "Prometheus - Authentication Required"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
     hosts:
       - prometheus.level-sony.cloud
     tls:
@@ -38,7 +36,7 @@ prometheus:
         hosts:
           - prometheus.level-sony.cloud
 
-# -- Grafana (disabled — hosted externally on separate server)
+# -- Grafana (hosted externally — disabled here)
 grafana:
   enabled: false
 
