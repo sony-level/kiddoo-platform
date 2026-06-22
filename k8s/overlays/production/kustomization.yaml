@@ -9,7 +9,6 @@ resources:
 namePrefix: prod-
 
 patches:
-  - path: restart-patch.yaml
   - path: configmap-patch.yaml
   - path: secret-patch.yaml
   - path: ingress-patch.yaml
