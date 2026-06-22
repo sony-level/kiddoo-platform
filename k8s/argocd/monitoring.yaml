@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kiddoo-monitoring
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: kiddoo-platform
+    environment: monitoring
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.discord: kiddoo-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.discord: kiddoo-alerts
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: kiddoo
+  sources:
+    # Helm chart from prometheus-community
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: "72.*"
+      helm:
+        releaseName: monitoring
+        valueFiles:
+          - $values/k8s/monitoring/values-prometheus.yaml
+    # Values file from our repo
+    - repoURL: https://github.com/sony-level/kiddoo-platform.git
+      targetRevision: master
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
