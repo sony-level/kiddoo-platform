@@ -8,3 +8,4 @@ data:
   ENVIRONMENT: "production"
   API_BASE_URL: "https://api.level-sony.cloud"
   CORS_ALLOWED_ORIGINS: "https://level-sony.cloud,https://www.level-sony.cloud"
+  IDENTITY_PROXY_URL: "http://prod-identity-proxy:8001"
