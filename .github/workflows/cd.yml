@@ -172,13 +172,13 @@ jobs:
 
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-output
           path: test-output.txt
 
       - name: Upload release binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-binaries
           path: |
@@ -210,7 +210,7 @@ jobs:
 
       - name: Upload audit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cargo-audit-report
           path: cargo-audit-report.txt
@@ -357,7 +357,7 @@ jobs:
 
       - name: Upload Trivy reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-source-reports
           path: |
@@ -597,7 +597,7 @@ jobs:
 
       - name: Upload image scan reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-image-reports
           path: |
